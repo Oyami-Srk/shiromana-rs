@@ -52,6 +52,7 @@ pub enum Error {
     LockError(LockError),
     JsonError(serde_json::Error),
     Other(String),
+    NoneError,
 }
 
 impl std::error::Error for Error {}
@@ -76,7 +77,8 @@ impl std::fmt::Display for Error {
                 write!(f, "Type Mismatch for {}. Expect {}, found {}.", val, expect, found),
             Locked(s) => write!(f, "Resource \"{}\" is locked.", s),
             LockError(s) => write!(f, "{}", s),
-            JsonError(e) => write!(f, "Error when processing json. {}", e)
+            JsonError(e) => write!(f, "Error when processing json. {}", e),
+            NoneError => write!(f, "Some values goes none.") // TODO: indicated error msg
         }
     }
 }
@@ -236,7 +238,7 @@ impl HashAlgo {
     }
 
 
-    pub fn do_hash(self, file_path: String) -> Result<String> {
+    pub fn do_hash(&self, file_path: String) -> Result<String> {
         let path = std::path::PathBuf::from(file_path);
         if !path.exists() {
             return Err(Error::NotExists(path.to_str().unwrap().to_string()));

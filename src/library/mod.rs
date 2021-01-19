@@ -191,6 +191,7 @@ impl Library {
         let shared_db = Connection::open(config::SHARED_DATABASE_FN)?;
         fs::create_dir(config::MEDIAS_FOLDER);
         env::set_current_dir(current_dir)?;
+        let library_path = library_path.canonicalize()?;
 
         Ok(Library {
             db,
@@ -215,7 +216,27 @@ impl Library {
         if !media_path.is_file() {
             return Err(err_type_mismatch_expect_dir_found_file!(media_path.to_str().unwrap().to_string()));
         }
-
+        let file_hash = self.hash_algo.do_hash(media_path.to_str().unwrap().to_string())?;
+        let file_name = media_path.file_name().unwrap().to_str().unwrap();
+        let file_ext = media_path.extension().unwrap().to_str().unwrap();
+        let new_path = path::PathBuf::new()
+            .join(self.path.as_str())
+            .join(config::MEDIAS_FOLDER)
+            .join(&file_hash[..2])
+            .join(&file_hash[2..].to_string().add(".").add(file_ext));
+        if new_path.exists() {
+            return Err(Error::AlreadyExists(new_path.to_str().unwrap().to_string()));
+        }
+        fs::create_dir_all(new_path.parent().unwrap())?;
+        fs::copy(&media_path, &new_path)?;
+        let file_size = new_path.metadata()?.len();
+        self.db.execute(
+            "INSERT INTO media (hash, filename, filesize, caption, type, sub_type, type_addition, comment)
+            VALUES (?,?,?,?,?,?,?,?);",
+            params![file_hash, file_name, file_size, caption, kind as u8, sub_kind, kind_addition, comment],
+        )?;
+        let id = self.db.last_insert_rowid();
+        // TODO: return a media type when impl media mod
         Ok(())
     }
 }

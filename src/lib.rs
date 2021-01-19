@@ -19,19 +19,15 @@ mod tests {
     #[test]
     fn it_works() {
         fs::remove_dir_all("test.mlib");
-        /*
-        let lib = match Library::create(".".to_string(), "test".to_string(), None) {
-            Ok(v) => v,
+        let mut lib = match Library::create(".".to_string(), "test".to_string(), None) {
+            Ok(mut v) => {
+                v.add_media("test/1.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
+            }
             Err(e) => {
                 println!("{}", e);
                 panic!("Error");
             }
-        };*/
-        println!("SHA1:{}\nMD5:{}\nSHA256:{}",
-                 HashAlgo::SHA1.do_hash("test/1.jpg".to_string()).unwrap(),
-                 HashAlgo::MD5.do_hash("test/1.jpg".to_string()).unwrap(),
-                 HashAlgo::SHA256.do_hash("test/1.jpg".to_string()).unwrap()
-        );
+        };
     }
 }
 
