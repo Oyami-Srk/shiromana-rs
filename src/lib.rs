@@ -21,7 +21,8 @@ mod tests {
         fs::remove_dir_all("test.mlib");
         let mut lib = match Library::create(".".to_string(), "test".to_string(), None) {
             Ok(mut v) => {
-                v.add_media("test/1.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
+                let id = v.add_media("test/1.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
+                v.remove_media(id).expect("??");
             }
             Err(e) => {
                 println!("{}", e);

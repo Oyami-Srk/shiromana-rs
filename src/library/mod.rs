@@ -119,7 +119,6 @@ impl Library {
         }
         fs::create_dir(&library_path)?;
         let library_uuid = Uuid::new_v4().to_hyphenated().to_string().to_uppercase();
-        fs::write(config::FINGERPRINT_FN, &library_uuid[..36]);
         let metadata = LibraryMetadata {
             UUID: library_uuid.clone(),
             library_name: library_name.clone(),
@@ -134,8 +133,9 @@ impl Library {
         };
         let current_dir = env::current_dir()?;
         let lock = Lock::acquire(LockType::FolderLock, library_path.to_str().unwrap())?;
-        env::set_current_dir(&library_path);
-        fs::write(config::METADATA_FN, serde_json::to_string(&metadata)?);
+        env::set_current_dir(&library_path)?;
+        fs::write(config::FINGERPRINT_FN, &library_uuid[..36])?;
+        fs::write(config::METADATA_FN, serde_json::to_string(&metadata)?)?;
         let db = Connection::open(config::DATABASE_FN)?;
         db.execute_batch(
             "CREATE TABLE media(
@@ -211,7 +211,7 @@ impl Library {
 
     pub fn add_media(&mut self, path: String, kind: MediaType, sub_kind: Option<String>,
                      kind_addition: Option<String>, caption: Option<String>,
-                     comment: Option<String>) -> Result<()> {
+                     comment: Option<String>) -> Result<u64> {
         let media_path = path::PathBuf::from(path);
         if !media_path.is_file() {
             return Err(err_type_mismatch_expect_dir_found_file!(media_path.to_str().unwrap().to_string()));
@@ -223,7 +223,7 @@ impl Library {
             .join(self.path.as_str())
             .join(config::MEDIAS_FOLDER)
             .join(&file_hash[..2])
-            .join(&file_hash[2..].to_string().add(".").add(file_ext));
+            .join(format!("{}.{}", &file_hash[2..], file_ext));
         if new_path.exists() {
             return Err(Error::AlreadyExists(new_path.to_str().unwrap().to_string()));
         }
@@ -233,10 +233,38 @@ impl Library {
         self.db.execute(
             "INSERT INTO media (hash, filename, filesize, caption, type, sub_type, type_addition, comment)
             VALUES (?,?,?,?,?,?,?,?);",
-            params![file_hash, file_name, file_size, caption, kind as u8, sub_kind, kind_addition, comment],
+            params![file_hash, file_name, &file_size, caption, kind as u8, sub_kind, kind_addition, comment],
         )?;
-        let id = self.db.last_insert_rowid();
+        let id = self.db.last_insert_rowid() as u64;
         // TODO: return a media type when impl media mod
+        self.summary.media_count += 1;
+        self.summary.media_size += file_size as usize;
+        Ok(id)
+    }
+
+    pub fn remove_media(&mut self, id: u64) -> Result<()> {
+        let (file_hash, file_name): (String, String) = self.db.query_row(
+            "SELECT hash, filename FROM media WHERE id = ?;",
+            params![&id],
+            |row| {
+                Ok((row.get(0)?, row.get(1)?))
+            },
+        )?;
+        let ext: Vec<&str> = file_name.split('.').collect();
+        let ext = ext[ext.len() - 1];
+        let media_file = path::PathBuf::new().
+            join(self.path.as_str()).
+            join(config::MEDIAS_FOLDER).
+            join(format!("{}.{}", file_hash, ext));
+        println!("{}", media_file.to_str().unwrap().to_string());
+        if !media_file.is_file() {
+            panic!("Media file is not exists or not a regular file.");
+        }
+        self.db.execute(
+            "DELETE FROM media WHERE id = ?;",
+            params![id],
+        );
+        fs::remove_file(media_file);
         Ok(())
     }
 }
