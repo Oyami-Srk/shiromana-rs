@@ -308,3 +308,9 @@ impl FromSql for Uuid {
             })
     }
 }
+
+impl std::fmt::Display for Uuid {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_string())
+    }
+}

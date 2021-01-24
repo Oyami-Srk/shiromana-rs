@@ -28,7 +28,13 @@ mod tests {
                 let id2 = v.add_media("test/2.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
                 let id4 = v.add_media("test/4.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
                 let id5 = v.add_media("test/5.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
-                let series_uuid = v.create_series(Some("test".to_string()), Some("for_test".to_string()));
+                let series_uuid = v.create_series(Some("test".to_string()), Some("for_test".to_string())).unwrap();
+                println!("Create new series with uuid: {}", series_uuid);
+                v.add_to_series(id1, &series_uuid, 1);
+                v.add_to_series(id2, &series_uuid, 2);
+                v.add_to_series(id3, &series_uuid, 4);
+                v.add_to_series(id4, &series_uuid, 6);
+                v.add_to_series(id5, &series_uuid, 4).expect("??");
                 v.update_media(id1, MediaUpdateKey::Comment, "Test".to_string()).expect("??");
             }
             Err(e) => {

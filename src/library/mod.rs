@@ -314,10 +314,10 @@ impl Library {
         Ok(uuid)
     }
 
-    pub fn delete_series(&mut self, uuid: Uuid) -> Result<()> {
+    pub fn delete_series(&mut self, uuid: &Uuid) -> Result<()> {
         self.db.execute(
             "DELETE FROM series WHERE uuid = ?;",
-            params![&uuid],
+            params![uuid],
         )?;
         self.db.execute(
             "UPDATE media SET series_uuid = NULL, series_no = NULL WHERE series_uuid = ?;",
@@ -327,7 +327,7 @@ impl Library {
         Ok(())
     }
 
-    pub fn add_to_series(&mut self, id: u64, uuid: Uuid, no: u64) -> Result<()> {
+    pub fn add_to_series(&mut self, id: u64, uuid: &Uuid, no: u64) -> Result<()> {
         let mut stmt = self.db.prepare(
             "SELECT series_no FROM media WHERE series_uuid = ?1 AND id != ?2;"
         )?;
@@ -336,8 +336,19 @@ impl Library {
             |row| {
                 row.get(0)
             })?;
-        let to_check: Vec<rusqlite::Result<u64>> = iter.collect();
+        let to_check: Vec<u64> = iter.map(|x| x.unwrap()).collect();
+        if to_check.iter().any(|i| { *i == no }) {
+            return Err(Error::Occupied(format!("occupied when add media(id {}) to series {} with no {}", id, uuid, no)));
+        }
         println!("{:?}", to_check);
+        self.db.execute(
+            "UPDATE media SET series_uuid = ?, series_no = ? WHERE id = ?;",
+            params![uuid, no, id],
+        )?;
+        self.db.execute(
+            "UPDATE series SET media_count = media_count + 1 WHERE uuid = ?;",
+            params![uuid],
+        )?;
         Ok(())
     }
 }
