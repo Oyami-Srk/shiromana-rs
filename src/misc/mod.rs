@@ -1,16 +1,8 @@
 #![macro_use]
 
 
-pub enum MediaType {
-    Image = 1,
-    Text = 2,
-    Audio = 3,
-    Video = 4,
-    Other = 10,
-}
-
 pub mod config {
-    pub const LIBRARY_EXT: &str = ".mlib";
+    pub const LIBRARY_EXT: &str = "mlib";
     pub const METADATA_FN: &str = "metadata.json";
     pub const DATABASE_FN: &str = "shiromana.db";
     pub const SHARED_DATABASE_FN: &str = "shared.db";

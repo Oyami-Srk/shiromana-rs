@@ -4,6 +4,7 @@ use uuid::Uuid;
 
 mod misc;
 mod library;
+mod media;
 
 #[cfg(test)]
 mod tests {
@@ -13,7 +14,8 @@ mod tests {
     use sha1::{Digest, Sha1};
     use uuid::Uuid;
 
-    use crate::library::{Library, LibrarySummary, MediaUpdateKey};
+    use crate::library::*;
+    use crate::media::*;
     use crate::misc::*;
 
     #[test]
