@@ -8,9 +8,11 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use md5::Md5;
+use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
 use serde_json;
 use sha1::{Digest, Sha1};
 use sha2::Sha256;
+use uuid::Uuid as _Uuid;
 
 use crate::misc::HashAlgo::SHA256;
 
@@ -101,13 +103,19 @@ impl From<serde_json::Error> for Error {
     }
 }
 
+impl From<uuid::Error> for Error {
+    fn from(err: uuid::Error) -> Self { Error::Other(format!("UUID error: {}", err)) }
+}
+
 pub type Result<T> = std::result::Result<T, Error>;
 
+#[derive(Debug)]
 pub enum LockType {
     FileLock,
     FolderLock,
 }
 
+#[derive(Debug)]
 pub enum LockStatus {
     Locked,
     Unlocked,
@@ -132,6 +140,7 @@ impl std::fmt::Display for LockError {
     }
 }
 
+#[derive(Debug)]
 pub struct Lock {
     kind: LockType,
     status: LockStatus,
@@ -264,5 +273,38 @@ impl HashAlgo {
                 format!("{:X}", hasher.finalize())
             }
         })
+    }
+}
+
+#[derive(Debug)]
+pub struct Uuid(_Uuid);
+
+impl Uuid {
+    pub fn to_string(&self) -> String {
+        self.0.to_hyphenated().to_string().to_uppercase()
+    }
+
+    pub fn new_v4() -> Uuid {
+        Uuid(_Uuid::new_v4())
+    }
+
+    pub fn from_str(s: &str) -> Result<Uuid> {
+        Ok(Uuid(uuid::Uuid::parse_str(s)?))
+    }
+}
+
+impl ToSql for Uuid {
+    fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
+        Ok(ToSqlOutput::from(self.to_string()))
+    }
+}
+
+impl FromSql for Uuid {
+    fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
+        value.as_str()
+            .and_then(|s| match Uuid::from_str(s) {
+                Ok(dt) => Ok(dt),
+                Err(err) => Err(FromSqlError::Other(Box::new(err)))
+            })
     }
 }

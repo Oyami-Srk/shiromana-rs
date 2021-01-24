@@ -7,13 +7,12 @@ use std::ops::Add;
 use std::str::FromStr;
 
 use rusqlite;
-use rusqlite::{Connection, params};
+use rusqlite::{Connection, params, params_from_iter};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 use crate::misc::{*};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LibrarySummary {
     pub media_count: usize,
     pub series_count: usize,
@@ -32,11 +31,13 @@ pub struct Library {
     db: rusqlite::Connection,
     shared_db: rusqlite::Connection,
     path: String,
-    uuid: uuid::Uuid,
+    uuid: Uuid,
     library_name: String,
+    master_name: Option<String>,
     schema: String,
     summary: LibrarySummary,
     hash_algo: HashAlgo,
+    lock: Lock,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -44,10 +45,30 @@ pub struct Library {
 struct LibraryMetadata {
     UUID: String,
     library_name: String,
-    master_name: String,
+    master_name: Option<String>,
     schema: String,
     hash_algo: String,
     summary: LibrarySummary,
+}
+
+pub enum MediaUpdateKey {
+    Filename,
+    Caption,
+    SubType,
+    TypeAddition,
+    Comment,
+}
+
+impl MediaUpdateKey {
+    fn to_key(&self) -> String {
+        match self {
+            MediaUpdateKey::Filename => "filename".to_string(),
+            MediaUpdateKey::Caption => "caption".to_string(),
+            MediaUpdateKey::SubType => "sub_type".to_string(),
+            MediaUpdateKey::TypeAddition => "type_addition".to_string(),
+            MediaUpdateKey::Comment => "comment".to_string()
+        }
+    }
 }
 
 impl Library {
@@ -99,11 +120,13 @@ impl Library {
             db,
             shared_db,
             path,
-            uuid: uuid::Uuid::from_str(library_uuid.as_str()).unwrap(),
+            uuid: Uuid::from_str(library_uuid.as_str()).unwrap(),
             library_name: metadata.library_name,
+            master_name: metadata.master_name,
             schema: metadata.schema,
             summary: metadata.summary,
             hash_algo: HashAlgo::from_string(metadata.hash_algo)?,
+            lock,
         })
     }
 
@@ -118,11 +141,11 @@ impl Library {
             return Err(Error::AlreadyExists(library_path.to_str().unwrap().to_string()));
         }
         fs::create_dir(&library_path)?;
-        let library_uuid = Uuid::new_v4().to_hyphenated().to_string().to_uppercase();
+        let library_uuid = Uuid::new_v4();
         let metadata = LibraryMetadata {
-            UUID: library_uuid.clone(),
+            UUID: library_uuid.to_string(),
             library_name: library_name.clone(),
-            master_name: master_name.unwrap_or("".to_string()),
+            master_name: master_name.clone(),
             schema: "Default".to_string(),
             summary: LibrarySummary {
                 media_count: 0,
@@ -134,7 +157,7 @@ impl Library {
         let current_dir = env::current_dir()?;
         let lock = Lock::acquire(LockType::FolderLock, library_path.to_str().unwrap())?;
         env::set_current_dir(&library_path)?;
-        fs::write(config::FINGERPRINT_FN, &library_uuid[..36])?;
+        fs::write(config::FINGERPRINT_FN, &library_uuid.to_string()[..36])?;
         fs::write(config::METADATA_FN, serde_json::to_string(&metadata)?)?;
         let db = Connection::open(config::DATABASE_FN)?;
         db.execute_batch(
@@ -197,8 +220,9 @@ impl Library {
             db,
             shared_db,
             path: library_path.to_str().unwrap().to_string(),
-            uuid: Uuid::from_str(library_uuid.as_str()).unwrap(),
+            uuid: library_uuid,
             library_name,
+            master_name,
             schema: "Default".to_string(),
             summary: LibrarySummary {
                 media_count: 0,
@@ -206,6 +230,7 @@ impl Library {
                 media_size: 0,
             },
             hash_algo: HashAlgo::from_string(config::DEFAULT_HASH_ALGO.to_string())?,
+            lock,
         })
     }
 
@@ -243,19 +268,20 @@ impl Library {
     }
 
     pub fn remove_media(&mut self, id: u64) -> Result<()> {
-        let (file_hash, file_name): (String, String) = self.db.query_row(
-            "SELECT hash, filename FROM media WHERE id = ?;",
+        let (file_hash, file_name, file_size): (String, String, usize) = self.db.query_row(
+            "SELECT hash, filename, filesize FROM media WHERE id = ?;",
             params![&id],
             |row| {
-                Ok((row.get(0)?, row.get(1)?))
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?))
             },
         )?;
         let ext: Vec<&str> = file_name.split('.').collect();
         let ext = ext[ext.len() - 1];
-        let media_file = path::PathBuf::new().
-            join(self.path.as_str()).
-            join(config::MEDIAS_FOLDER).
-            join(format!("{}.{}", file_hash, ext));
+        let media_file = path::PathBuf::new()
+            .join(self.path.as_str())
+            .join(config::MEDIAS_FOLDER)
+            .join(&file_hash[..2])
+            .join(format!("{}.{}", &file_hash[2..], ext));
         println!("{}", media_file.to_str().unwrap().to_string());
         if !media_file.is_file() {
             panic!("Media file is not exists or not a regular file.");
@@ -265,6 +291,70 @@ impl Library {
             params![id],
         );
         fs::remove_file(media_file);
+        self.summary.media_size -= file_size;
+        self.summary.media_count -= 1;
         Ok(())
+    }
+
+    pub fn update_media(&mut self, id: u64, key: MediaUpdateKey, value: String) -> Result<()> {
+        self.db.execute(
+            format!("UPDATE media SET {} = ? WHERE id = ?;", key.to_key()).as_str(),
+            params![value, id],
+        )?;
+        Ok(())
+    }
+
+    pub fn create_series(&mut self, caption: Option<String>, comment: Option<String>) -> Result<Uuid> {
+        let uuid = Uuid::new_v4();
+        self.db.execute(
+            "INSERT INTO series (uuid, caption, comment, media_count) VALUES (?, ?, ?, 0);",
+            params![uuid, caption, comment],
+        )?;
+        self.summary.series_count += 1;
+        Ok(uuid)
+    }
+
+    pub fn delete_series(&mut self, uuid: Uuid) -> Result<()> {
+        self.db.execute(
+            "DELETE FROM series WHERE uuid = ?;",
+            params![&uuid],
+        )?;
+        self.db.execute(
+            "UPDATE media SET series_uuid = NULL, series_no = NULL WHERE series_uuid = ?;",
+            params![uuid],
+        )?;
+        self.summary.series_count -= 1;
+        Ok(())
+    }
+
+    pub fn add_to_series(&mut self, id: u64, uuid: Uuid, no: u64) -> Result<()> {
+        let mut stmt = self.db.prepare(
+            "SELECT series_no FROM media WHERE series_uuid = ?1 AND id != ?2;"
+        )?;
+        let iter = stmt.query_map(
+            params![uuid, id],
+            |row| {
+                row.get(0)
+            })?;
+        let to_check: Vec<rusqlite::Result<u64>> = iter.collect();
+        println!("{:?}", to_check);
+        Ok(())
+    }
+}
+
+impl Drop for Library {
+    fn drop(&mut self) {
+        let metadata = LibraryMetadata {
+            UUID: self.uuid.to_string(),
+            library_name: self.library_name.clone(),
+            master_name: self.master_name.clone(),
+            schema: self.schema.clone(),
+            summary: self.summary.clone(),
+            hash_algo: self.hash_algo.to_string(),
+        };
+        fs::write(path::PathBuf::new().
+            join(&self.path[..]).
+            join(config::METADATA_FN),
+                  serde_json::to_string(&metadata).expect("Cannot serialize metadata.")).expect("Cannot write to metadata.");
     }
 }
