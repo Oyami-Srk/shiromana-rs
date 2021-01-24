@@ -34,7 +34,6 @@ mod tests {
                 v.add_to_series(id2, &series_uuid, 2);
                 v.add_to_series(id3, &series_uuid, 4);
                 v.add_to_series(id4, &series_uuid, 6);
-                v.add_to_series(id5, &series_uuid, 4).expect("??");
                 v.update_media(id1, MediaUpdateKey::Comment, "Test".to_string()).expect("??");
             }
             Err(e) => {
