@@ -9,6 +9,7 @@ use std::str::FromStr;
 use rusqlite;
 use rusqlite::{Connection, params, params_from_iter};
 use serde::{Deserialize, Serialize};
+use serde::__private::Formatter;
 
 use crate::misc::{*};
 
@@ -22,7 +23,7 @@ pub struct LibrarySummary {
 impl fmt::Display for LibrarySummary {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Library Summary:\nMedia count: {}\nSeries count: {}\nMedia Size: {} KB\n",
-               self.media_count, self.series_count, self.media_size)
+               self.media_count, self.series_count, self.media_size / 1024)
     }
 }
 
@@ -351,6 +352,93 @@ impl Library {
         )?;
         Ok(())
     }
+
+    pub fn remove_from_series(&mut self, id: u64) -> Result<()> {
+        let uuid: Uuid = self.db.query_row(
+            "SELECT series_uuid FROM media WHERE id = ?;",
+            params![id],
+            |row| Ok(row.get(0)?),
+        )?;
+        self.db.execute(
+            "UPDATE media SET series_uuid = NULL, series_no = NULL WHERE id = ?;",
+            params![id],
+        )?;
+        self.db.execute(
+            "UPDATE series SET media_count = media_count - 1 WHERE uuid = ?;",
+            params![uuid],
+        )?;
+        Ok(())
+    }
+
+    pub fn update_series_no(&mut self, id: u64, no: u64, insert: bool) -> Result<()> {
+        let uuid: Uuid = match {
+            let uuid: Option<Uuid> = self.db.query_row(
+                "SELECT series_uuid FROM media WHERE id = ?;",
+                params![id],
+                |row| Ok(
+                    row.get(0)?
+                ),
+            )?;
+            uuid
+        } {
+            None => return Err(Error::NotIn { a: format!("Media #{}", id), b: format!("series") }),
+            Some(u) => u
+        };
+        let mut stmt = self.db.prepare(
+            "SELECT series_no FROM media WHERE series_uuid = ?1 AND id != ?2;"
+        )?;
+        let iter = stmt.query_map(
+            params![uuid, id],
+            |row| {
+                row.get(0)
+            })?;
+        let to_check: Vec<u64> = iter.map(|x| x.unwrap()).collect();
+        if to_check.iter().any(|i| { *i == no }) {
+            // insert or error
+            if !insert {
+                return Err(Error::Occupied(format!("occupied when add media(id {}) to series {} with no {}", id, uuid, no)));
+            }
+            self.db.execute(
+                "UPDATE media SET series_no = series_no + 1 WHERE series_uuid = ? AND series_no >= ?;",
+                params![uuid, no],
+            )?;
+            self.db.execute(
+                "UPDATE media SET series_no = ? WHERE id = ?;",
+                params![no, id],
+            )?;
+        } else {
+            self.db.execute(
+                "UPDATE media SET series_no = ? WHERE id = ?;",
+                params![no, id],
+            )?;
+        }
+        Ok(())
+    }
+
+    pub fn trim_series_no(&mut self, uuid: &Uuid) -> Result<()> {
+        // I sincerely recommend you not to use this function as much as possible
+        let mut ids: Vec<(u64, u64)> = self.db.prepare(
+            "SELECT id, series_no FROM media WHERE series_uuid = ?;")?.query_map(
+            params![uuid],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?.map(|x| x.unwrap()).collect();
+        ids.sort_by(|a, b| a.1.cmp(&b.1));
+        ids[0].1 = 1;
+        for i in 1..ids.len() {
+            ids[i].1 = ids[i - 1].1 + 1;
+        }
+        for (id, no) in ids {
+            self.db.execute(
+                "UPDATE media SET series_no = ? WHERE id = ?;",
+                params![no, id],
+            )?;
+        }
+        Ok(())
+    }
+
+    pub fn get_media(&self, id: u64) -> Result<()> {
+        unimplemented!()
+    }
 }
 
 impl Drop for Library {
@@ -367,5 +455,17 @@ impl Drop for Library {
             join(&self.path[..]).
             join(config::METADATA_FN),
                   serde_json::to_string(&metadata).expect("Cannot serialize metadata.")).expect("Cannot write to metadata.");
+    }
+}
+
+impl std::fmt::Display for Library {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Library name: {}\nMaster name: {}\nUUID: {}\nPath: {}\nschema: {}\n{}",
+               self.library_name,
+               self.master_name.as_ref().unwrap_or(&"".to_string()),
+               self.uuid,
+               self.path,
+               self.schema,
+               self.summary)
     }
 }

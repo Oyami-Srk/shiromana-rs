@@ -15,6 +15,9 @@ impl Uuid {
     }
 
     pub fn from_str(s: &str) -> Result<Uuid> {
+        if s.len() == 0 {
+            return Err(Error::NoneError);
+        }
         Ok(Uuid(_Uuid::parse_str(s)?))
     }
 }
