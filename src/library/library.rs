@@ -1,6 +1,9 @@
 use std::{any, collections, env, fmt, fs, io, ops, path, str};
 
 use rusqlite::{Connection, params, params_from_iter};
+use textwrap::indent;
+
+use crate::media::Media;
 
 use super::{Library, LibraryMetadata, LibrarySummary};
 use super::super::media::{MediaType, MediaUpdateKey};
@@ -140,7 +143,8 @@ impl Library {
                     uuid CHAR(36) PRIMARY KEY NOT NULL UNIQUE,
                     path TEXT NOT NULL,
                     comment TEXT
-                );")?;
+                );
+                ")?;
         db.execute(
             "INSERT INTO library (uuid, path) VALUES
                     (?, ?);",
@@ -394,12 +398,12 @@ impl Drop for Library {
 
 impl fmt::Display for Library {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Library name: {}\nMaster name: {}\nUUID: {}\nPath: {}\nschema: {}\n{}",
+        write!(f, "Library name: {}\nMaster name: {}\nUUID: {}\nPath: {}\nschema: {}\nLibrary Summary:\n{}",
                self.library_name,
                self.master_name.as_ref().unwrap_or(&"".to_string()),
                self.uuid,
                self.path,
                self.schema,
-               self.summary)
+               indent(&format!("{}", self.summary), "    |-"))
     }
 }
