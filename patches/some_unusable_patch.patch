@@ -1,0 +1,61 @@
+Index: src/lib.rs
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs	(revision acd26ca8993757f08f8d00386451df5a2e574c2a)
++++ b/src/lib.rs	(date 1611608577649)
+@@ -21,32 +21,27 @@
+     #[test]
+     fn it_works() {
+         fs::remove_dir_all("test.mlib");
+-        let mut lib = match Library::create(".".to_string(), "test".to_string(), None) {
+-            Ok(mut v) => {
+-                let id1 = v.add_media("test/1.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
+-                let id2 = v.add_media("test/2.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
+-                let id3 = v.add_media("test/3.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
+-                v.remove_media(id2);
+-                let id2 = v.add_media("test/2.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
+-                let id4 = v.add_media("test/4.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
+-                let id5 = v.add_media("test/5.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
+-                let series_uuid = v.create_series(Some("test".to_string()), Some("for_test".to_string())).unwrap();
+-                println!("Create new series with uuid: {}", series_uuid);
+-                v.add_to_series(id1, &series_uuid, 9);
+-                v.add_to_series(id2, &series_uuid, 2);
+-                v.add_to_series(id3, &series_uuid, 4);
+-                v.add_to_series(id4, &series_uuid, 6);
+-                v.update_media(id1, MediaUpdateKey::Comment, "Test".to_string()).expect("??");
+-                v.remove_from_series(id2);
+-                v.trim_series_no(&series_uuid);
++        let mut lib = Library::create(".".to_string(), "test".to_string(), None).expect("Creating library failed.");
++
++        let mut media1 = lib.add_media("test/1.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
++        let mut media2 = lib.add_media("test/2.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
++        let mut media3 = lib.add_media("test/3.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
++        lib.remove_media(media2);
++        let mut media2 = lib.add_media("test/2.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
++        let mut media4 = lib.add_media("test/4.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
++        let mut media5 = lib.add_media("test/5.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
++        let series_uuid = lib.create_series(Some("test".to_string()), Some("for_test".to_string())).unwrap();
++        println!("Create new series with uuid: {}", series_uuid);
++        lib.add_to_series(&mut media1, &series_uuid, 9);
++        lib.add_to_series(&mut media2, &series_uuid, 2);
++        lib.add_to_series(&mut media3, &series_uuid, 4);
++        lib.add_to_series(&mut media4, &series_uuid, 6);
++        lib.update_media(&mut media1, MediaUpdateKey::Comment, "Test".to_string()).expect("??");
++        lib.remove_from_series(&mut media2);
++        lib.trim_series_no(&series_uuid);
+ 
+-                println!("{}", v);
+-            }
+-            Err(e) => {
+-                println!("{}", e);
+-                panic!("Error");
+-            }
+-        };
++        println!("{}", lib);
++        println!("{}", media1);
+     }
+ }
+ 
