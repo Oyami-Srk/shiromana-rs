@@ -11,10 +11,10 @@ pub struct LibrarySummary {
 
 #[derive(Debug)]
 pub struct Library {
-    db: rusqlite::Connection,
+    pub(crate) db: rusqlite::Connection,
     shared_db: rusqlite::Connection,
     path: String,
-    uuid: super::misc::Uuid,
+    pub(crate) uuid: super::misc::Uuid,
     library_name: String,
     master_name: Option<String>,
     schema: String,
