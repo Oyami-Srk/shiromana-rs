@@ -17,14 +17,14 @@ impl Display for MediaType {
     }
 }
 
-impl Display for Media<'_> {
+impl Display for Media {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         let mut s: String = String::new();
 
         s.push_str(&format!(
             "Media ID: {}\nLibrary UUID: {}\nHash: {}\nFile name: {}\nAdd Time: {}\n\
             Media Type: {}\nMedia Size: {:.2} KB\n",
-            self.id, self.library.uuid, self.hash, self.filename, self.time_add,
+            self.id, self.library_uuid, self.hash, self.filename, self.time_add,
             self.kind, self.filesize / 1024,
         ));
 
@@ -46,6 +46,7 @@ impl Display for Media<'_> {
         if let Some(v) = &self.comment {
             s.push_str(&format!("Comment: {}\n", v));
         }
+        s.push_str(&format!("File path: {}", self.filepath));
 
         write!(f, "{}", s)
     }

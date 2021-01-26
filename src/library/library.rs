@@ -1,5 +1,7 @@
 use std::{any, collections, env, fmt, fs, io, ops, path, str};
 
+use chrono::{DateTime, Local};
+use num::FromPrimitive;
 use rusqlite::{Connection, params, params_from_iter};
 use textwrap::indent;
 
@@ -7,7 +9,7 @@ use crate::media::Media;
 
 use super::{Library, LibraryMetadata, LibrarySummary};
 use super::super::media::{MediaType, MediaUpdateKey};
-use super::super::misc::{config, Error, HashAlgo, Lock, LockError, LockStatus, LockType, Result, Uuid};
+use super::super::misc::{config, Error, HashAlgo, Lock, LockError, LockStatus, LockType, Result, tools, Uuid};
 
 impl Library {
     pub fn open(path: String) -> Result<Library> {
@@ -23,9 +25,8 @@ impl Library {
                 let to_check: Vec<&str> = vec![config::METADATA_FN,
                                                config::FINGERPRINT_FN,
                                                config::DATABASE_FN,
-                                               config::SHARED_DATABASE_FN,
-                                               config::MEDIAS_FOLDER].
-                    iter().copied().collect();
+                                               config::SHARED_DATABASE_FN]
+                    .iter().copied().collect();
                 let files_list = files.map(|entry| {
                     let entry = entry.unwrap();
                     let filename = entry.file_name().to_str().unwrap().to_string();
@@ -61,6 +62,7 @@ impl Library {
             uuid: Uuid::from_str(library_uuid.as_str()).unwrap(),
             library_name: metadata.library_name,
             master_name: metadata.master_name,
+            media_folder: metadata.media_folder,
             schema: metadata.schema,
             summary: metadata.summary,
             hash_algo: HashAlgo::from_string(metadata.hash_algo)?,
@@ -68,7 +70,7 @@ impl Library {
         })
     }
 
-    pub fn create(path: String, library_name: String, master_name: Option<String>) -> Result<Library> {
+    pub fn create(path: String, library_name: String, master_name: Option<String>, media_folder: Option<String>) -> Result<Library> {
         let library_path = path::PathBuf::from(path);
         let library_path = if library_path.is_absolute() {
             library_path
@@ -80,11 +82,22 @@ impl Library {
         }
         fs::create_dir(&library_path)?;
         let library_uuid = Uuid::new_v4();
+        let media_folder = match media_folder {
+            Some(v) => {
+                if tools::is_valid_filename(&v) {
+                    v
+                } else {
+                    config::DEFAULT_MEDIAS_FOLDER.to_string()
+                }
+            }
+            None => config::DEFAULT_MEDIAS_FOLDER.to_string()
+        };
         let metadata = LibraryMetadata {
             UUID: library_uuid.to_string(),
             library_name: library_name.clone(),
             master_name: master_name.clone(),
             schema: "Default".to_string(),
+            media_folder: media_folder.clone(),
             summary: LibrarySummary {
                 media_count: 0,
                 series_count: 0,
@@ -151,7 +164,7 @@ impl Library {
             params![&library_uuid, env::current_dir()?.to_str()],
         )?;
         let shared_db = Connection::open(config::SHARED_DATABASE_FN)?;
-        fs::create_dir(config::MEDIAS_FOLDER);
+        fs::create_dir(&media_folder);
         env::set_current_dir(current_dir)?;
         let library_path = library_path.canonicalize()?;
 
@@ -162,6 +175,7 @@ impl Library {
             uuid: library_uuid,
             library_name,
             master_name,
+            media_folder,
             schema: "Default".to_string(),
             summary: LibrarySummary {
                 media_count: 0,
@@ -185,7 +199,7 @@ impl Library {
         let file_ext = media_path.extension().unwrap().to_str().unwrap();
         let new_path = path::PathBuf::new()
             .join(self.path.as_str())
-            .join(config::MEDIAS_FOLDER)
+            .join(&self.media_folder)
             .join(&file_hash[..2])
             .join(format!("{}.{}", &file_hash[2..], file_ext));
         if new_path.exists() {
@@ -218,7 +232,7 @@ impl Library {
         let ext = ext[ext.len() - 1];
         let media_file = path::PathBuf::new()
             .join(self.path.as_str())
-            .join(config::MEDIAS_FOLDER)
+            .join(&self.media_folder)
             .join(&file_hash[..2])
             .join(format!("{}.{}", &file_hash[2..], ext));
         println!("{}", media_file.to_str().unwrap().to_string());
@@ -374,8 +388,67 @@ impl Library {
         Ok(())
     }
 
-    pub fn get_media(&self, id: u64) -> Result<()> {
-        unimplemented!()
+
+    pub fn get_media(&self, id: u64) -> Result<Media> {
+        // TODO: figure out the time spend on selecting one column and more.
+        let mut kind: u64 = 0;
+        let mut media =
+            self.db.query_row(
+                "SELECT
+                        hash, filename, filesize, caption, time_add,
+                        type, sub_type, type_addition, series_uuid,
+                        series_no, comment
+                      FROM media WHERE id = ?;",
+                params![id],
+                |row|
+                    {
+                        kind = row.get(5)?;
+                        let hash: String = row.get(0)?;
+                        let filename = row.get(1)?;
+                        let filepath =
+                            path::PathBuf::new()
+                                .join(&self.path)
+                                .join(&self.media_folder)
+                                .join(&hash[..2])
+                                .join(format!("{}.{}",
+                                              &hash[2..],
+                                              path::PathBuf::from(&filename).
+                                                  extension().unwrap().to_str().unwrap())
+                                );
+                        let filepath = filepath.to_str().unwrap().to_string();
+                        Ok(Media {
+                            id,
+                            library_uuid: self.uuid.clone(),
+                            hash,
+                            filename,
+                            filepath,
+                            filesize: row.get(2)?,
+                            caption: row.get(3)?,
+                            time_add: row.get(4)?,
+                            kind: MediaType::Other,
+                            sub_kind: row.get(6)?,
+                            kind_addition: row.get(7)?,
+                            series_uuid: row.get(8)?,
+                            series_no: row.get(9)?,
+                            comment: row.get(10)?,
+                            detail: None,
+                        })
+                    },
+            )?;
+
+        let kind = match FromPrimitive::from_u64(kind) {
+            Some(v) => v,
+            None => return Err(Error::NotExists(format!("MediaType ID {}", kind)))
+        };
+        media.kind = kind;
+
+        let is_detailed: bool = self.db.query_row(
+            "SELECT EXISTS(SELECT 1 FROM media_detail WHERE id = ?);",
+            params![id],
+            |row| Ok(row.get(0)?),
+        )?;
+
+        Ok(media)
     }
 }
 
@@ -388,6 +461,7 @@ impl Drop for Library {
             schema: self.schema.clone(),
             summary: self.summary.clone(),
             hash_algo: self.hash_algo.to_string(),
+            media_folder: self.media_folder.clone(),
         };
         fs::write(path::PathBuf::new().
             join(&self.path[..]).

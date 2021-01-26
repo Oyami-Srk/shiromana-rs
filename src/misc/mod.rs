@@ -7,7 +7,7 @@ pub mod config {
     pub const DATABASE_FN: &str = "shiromana.db";
     pub const SHARED_DATABASE_FN: &str = "shared.db";
     pub const FINGERPRINT_FN: &str = ".shiromana";
-    pub const MEDIAS_FOLDER: &str = "medias";
+    pub const DEFAULT_MEDIAS_FOLDER: &str = "medias";
     pub const MEDIAS_HASH_LEVEL: u32 = 1;
     // max files is only for warning
     pub const MEDIAS_FOLDER_MAX_FILES: u32 = 10000;
@@ -79,10 +79,11 @@ pub enum HashAlgo {
     SHA256,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Uuid(::uuid::Uuid);
 
 mod error;
 mod lock;
 mod hash;
 mod uuid;
+pub mod tools;

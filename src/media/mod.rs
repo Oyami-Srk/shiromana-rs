@@ -30,11 +30,12 @@ impl MediaUpdateKey {
     }
 }
 
-pub struct Media<'l> {
+pub struct Media {
     pub(crate) id: u64,
-    pub(crate) library: &'l super::library::Library,
+    pub(crate) library_uuid: super::misc::Uuid,
     pub(crate) hash: String,
     pub(crate) filename: String,
+    pub(crate) filepath: String,
     pub(crate) filesize: usize,
     pub(crate) caption: Option<String>,
     pub(crate) time_add: chrono::DateTime<chrono::Local>,
