@@ -8,11 +8,12 @@ use super::MediaType;
 impl Display for MediaType {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            MediaType::Image => write!(f, "Image"),
-            MediaType::Text => write!(f, "Text"),
-            MediaType::Audio => write!(f, "Audio"),
-            MediaType::Video => write!(f, "Video"),
-            MediaType::Other => write!(f, "Other")
+            MediaType::Image(v) => write!(f, "Image{}", if v.is_some() { "(Detailed)" } else { "" }),
+            MediaType::Text(v) => write!(f, "Text{}", if v.is_some() { "(Detailed)" } else { "" }),
+            MediaType::Audio(v) => write!(f, "Audio{}", if v.is_some() { "(Detailed)" } else { "" }),
+            MediaType::Video(v) => write!(f, "Video{}", if v.is_some() { "(Detailed)" } else { "" }),
+            MediaType::Other(v) => write!(f, "Other{}", if v.is_some() { "(Detailed)" } else { "" }),
+            MediaType::None => write!(f, "None")
         }
     }
 }

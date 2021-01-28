@@ -2,10 +2,10 @@ use std::{any, collections, env, fmt, fs, io, ops, path, str};
 
 use chrono::{DateTime, Local};
 use num::FromPrimitive;
-use rusqlite::{Connection, params, params_from_iter};
+use rusqlite::{Connection, params, Params, params_from_iter, ToSql};
 use textwrap::indent;
 
-use crate::media::Media;
+use crate::media::*;
 
 use super::{Library, LibraryMetadata, LibrarySummary};
 use super::super::media::{MediaType, MediaUpdateKey};
@@ -130,11 +130,9 @@ impl Library {
 
                 CREATE TABLE media_detail(
                     id INTEGER PRIMARY KEY NOT NULL UNIQUE,
-                    height INTEGER NOT NULL,
-                    width INTEGER NOT NULL,
-                    dpi TEXT NOT NULL,
                     format TEXT NOT NULL,
                     tags TEXT, /* Split by ',' */
+                    details TEXT, /* json format */
                     FOREIGN KEY(id) REFERENCES media(id)
                 );
 
@@ -211,7 +209,7 @@ impl Library {
         self.db.execute(
             "INSERT INTO media (hash, filename, filesize, caption, type, sub_type, type_addition, comment)
             VALUES (?,?,?,?,?,?,?,?);",
-            params![file_hash, file_name, &file_size, caption, kind as u8, sub_kind, kind_addition, comment],
+            params![file_hash, file_name, &file_size, caption, kind, sub_kind, kind_addition, comment],
         )?;
         let id = self.db.last_insert_rowid() as u64;
         // TODO: return a media type when impl media mod
@@ -391,7 +389,6 @@ impl Library {
 
     pub fn get_media(&self, id: u64) -> Result<Media> {
         // TODO: figure out the time spend on selecting one column and more.
-        let mut kind: u64 = 0;
         let mut media =
             self.db.query_row(
                 "SELECT
@@ -402,7 +399,6 @@ impl Library {
                 params![id],
                 |row|
                     {
-                        kind = row.get(5)?;
                         let hash: String = row.get(0)?;
                         let filename = row.get(1)?;
                         let filepath =
@@ -425,22 +421,15 @@ impl Library {
                             filesize: row.get(2)?,
                             caption: row.get(3)?,
                             time_add: row.get(4)?,
-                            kind: MediaType::Other,
+                            kind: row.get(5)?,
                             sub_kind: row.get(6)?,
                             kind_addition: row.get(7)?,
                             series_uuid: row.get(8)?,
                             series_no: row.get(9)?,
                             comment: row.get(10)?,
-                            detail: None,
                         })
                     },
             )?;
-
-        let kind = match FromPrimitive::from_u64(kind) {
-            Some(v) => v,
-            None => return Err(Error::NotExists(format!("MediaType ID {}", kind)))
-        };
-        media.kind = kind;
 
         let is_detailed: bool = self.db.query_row(
             "SELECT EXISTS(SELECT 1 FROM media_detail WHERE id = ?);",
@@ -449,6 +438,14 @@ impl Library {
         )?;
 
         Ok(media)
+    }
+
+    pub fn query_media(&self, sql_stmt: &str) -> Result<Vec<u64>> {
+        unimplemented!()
+    }
+
+    pub fn query_series(&self, sql_stmt: &str) -> Result<Vec<Uuid>> {
+        unimplemented!()
     }
 }
 

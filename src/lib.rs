@@ -24,13 +24,13 @@ mod tests {
         fs::remove_dir_all("test.mlib");
         let mut lib = match Library::create(".".to_string(), "test".to_string(), None, Some("Mass".to_string())) {
             Ok(mut v) => {
-                let id1 = v.add_media("test/1.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
-                let id2 = v.add_media("test/2.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
-                let id3 = v.add_media("test/3.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
+                let id1 = v.add_media("test/1.jpg".to_string(), MediaType::Image(None), None, None, None, None).expect("??");
+                let id2 = v.add_media("test/2.jpg".to_string(), MediaType::Image(None), None, None, None, None).expect("??");
+                let id3 = v.add_media("test/3.jpg".to_string(), MediaType::Image(None), None, None, None, None).expect("??");
                 v.remove_media(id2);
-                let id2 = v.add_media("test/2.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
-                let id4 = v.add_media("test/4.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
-                let id5 = v.add_media("test/5.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
+                let id2 = v.add_media("test/2.jpg".to_string(), MediaType::Image(None), None, None, None, None).expect("??");
+                let id4 = v.add_media("test/4.jpg".to_string(), MediaType::Image(None), None, None, None, None).expect("??");
+                let id5 = v.add_media("test/5.jpg".to_string(), MediaType::Image(None), None, None, None, None).expect("??");
                 let series_uuid = v.create_series(Some("test".to_string()), Some("for_test".to_string())).unwrap();
                 println!("Create new series with uuid: {}", series_uuid);
                 v.add_to_series(id1, &series_uuid, 9);
@@ -46,22 +46,24 @@ mod tests {
                 let media2 = v.get_media(id2).unwrap();
                 println!("Media Info ( ID {} ):\n{}", id1, textwrap::indent(&format!("{}", media1), "    "));
                 println!("Media Info ( ID {} ):\n{}", id2, textwrap::indent(&format!("{}", media2), "    "));
-                println!("Trying to adding huge amount of files.");
-                let begin = chrono::Local::now();
-                let files = fs::read_dir("test/Fatkun").unwrap();
-                for f in files {
-                    let adding = || {
-                        let f = f.unwrap().path().to_str().unwrap().to_string();
-                        print!("Adding {} ...", &f);
-                        match v.add_media(f.clone(), MediaType::Image, None, None, None, None) {
-                            Err(e) => println!("Error when adding {}: {}", f, e),
-                            Ok(_) => println!("Done"),
-                        }
-                    };
-                    adding();
+                if false {
+                    println!("Trying to adding huge amount of files.");
+                    let begin = chrono::Local::now();
+                    let files = fs::read_dir("test/Fatkun").unwrap();
+                    for f in files {
+                        let adding = || {
+                            let f = f.unwrap().path().to_str().unwrap().to_string();
+                            print!("Adding {} ...", &f);
+                            match v.add_media(f.clone(), MediaType::Image(None), None, None, None, None) {
+                                Err(e) => println!("Error when adding {}: {}", f, e),
+                                Ok(_) => println!("Done"),
+                            }
+                        };
+                        adding();
+                    }
+                    let end = chrono::Local::now();
+                    println!("Time usage: {}", end - begin);
                 }
-                let end = chrono::Local::now();
-                println!("Time usage: {}", end - begin);
             }
             Err(e) => {
                 println!("{}", e);
