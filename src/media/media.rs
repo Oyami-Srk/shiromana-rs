@@ -1,4 +1,10 @@
+use std::collections::HashMap;
+use std::path;
+
 use chrono::{DateTime, FixedOffset, Local, Utc};
+use image::GenericImageView;
+use image::ImageFormat;
+use image::io::Reader as ImageReader;
 use num::FromPrimitive;
 use num_traits::{AsPrimitive, ToPrimitive};
 use rusqlite::params;
@@ -10,8 +16,40 @@ use super::super::library::Library;
 use super::super::misc::{Error, Result, Uuid};
 
 impl Media {
-    pub fn detailed(self) -> Media {
-        unimplemented!()
+    pub fn detailed(self, other: HashMap<String, String>) -> Media {
+        let detail = match &self.kind {
+            MediaType::Image => ImageDetail::get_detail(&self.filepath),
+            MediaType::Text => TextDetail::get_detail(&self.filepath),
+            MediaType::Audio => AudioDetail::get_detail(&self.filepath),
+            MediaType::Video => VideoDetail::get_detail(&self.filepath),
+            MediaType::Other => return {
+                Media {
+                    detail: Some(MediaDetail {
+                        detail: TypesDetail::Other,
+                        other,
+                    }),
+                    ..self
+                }
+            },
+            MediaType::None => return self
+        };
+        match &detail {
+            Ok(_) => {}
+            Err(e) => { println!("{}", e); }
+        }
+        if detail.is_err() {
+            return self;
+        }
+        let detail = detail.unwrap();
+        Media {
+            detail: Some(
+                MediaDetail {
+                    detail,
+                    other,
+                }
+            ),
+            ..self
+        }
     }
 }
 
@@ -24,11 +62,11 @@ impl Into<u64> for Media {
 impl MediaType {
     pub fn get_typeid(&self) -> u32 {
         match self {
-            MediaType::Image(_) => 1,
-            MediaType::Text(_) => 2,
-            MediaType::Audio(_) => 3,
-            MediaType::Video(_) => 4,
-            MediaType::Other(_) => 10,
+            MediaType::Image => 1,
+            MediaType::Text => 2,
+            MediaType::Audio => 3,
+            MediaType::Video => 4,
+            MediaType::Other => 10,
             MediaType::None => 99999,
         }
     }
@@ -47,12 +85,12 @@ impl TryFrom<u32> for MediaType {
     fn try_from(v: u32) -> Result<Self> {
         Ok(
             match v {
-                1 => MediaType::Image(None),
-                2 => MediaType::Image(None),
-                3 => MediaType::Image(None),
-                4 => MediaType::Image(None),
-                10 => MediaType::Image(None),
-                99999 => MediaType::Image(None),
+                1 => MediaType::Image,
+                2 => MediaType::Text,
+                3 => MediaType::Audio,
+                4 => MediaType::Video,
+                10 => MediaType::Other,
+                99999 => MediaType::None,
                 _ => return Err(Error::TypeMismatch { val: v.to_string(), expect: "valid type id".to_string(), found: "invalid type id".to_string() })
             })
     }
@@ -78,3 +116,63 @@ impl FromSql for MediaType {
     }
 }
 
+impl MediaType {
+    pub fn is_some(&self) -> bool {
+        match self {
+            MediaType::None => false,
+            _ => true
+        }
+    }
+
+    pub fn is_none(&self) -> bool {
+        !self.is_some()
+    }
+}
+
+trait GetDetail {
+    fn get_detail(media_path: &str) -> Result<TypesDetail>;
+}
+
+impl GetDetail for ImageDetail {
+    fn get_detail(media_path: &str) -> Result<TypesDetail> {
+        let img = ImageReader::open(media_path)?;
+        let format = img.format();
+        let (width, height) = img.into_dimensions()?;
+        let format = match format {
+            Some(v) => match v {
+                ImageFormat::Png => "PNG",
+                ImageFormat::Jpeg => "JPG",
+                ImageFormat::Gif => "GIF",
+                ImageFormat::WebP => "WEBP",
+                ImageFormat::Tiff => "TIFF",
+                ImageFormat::Bmp => "BMP",
+                ImageFormat::Ico => "ICO",
+                _ => "OTHER"
+            },
+            None => return Err(Error::MediaDecode("Unknown Image format.".to_string()))
+        }.to_string();
+        Ok(TypesDetail::Image(ImageDetail {
+            width,
+            height,
+            format,
+        }))
+    }
+}
+
+impl GetDetail for TextDetail {
+    fn get_detail(media_path: &str) -> Result<TypesDetail> {
+        unimplemented!()
+    }
+}
+
+impl GetDetail for AudioDetail {
+    fn get_detail(media_path: &str) -> Result<TypesDetail> {
+        unimplemented!()
+    }
+}
+
+impl GetDetail for VideoDetail {
+    fn get_detail(media_path: &str) -> Result<TypesDetail> {
+        unimplemented!()
+    }
+}

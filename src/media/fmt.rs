@@ -2,17 +2,19 @@ use std::fmt::{Display, Formatter, Result};
 
 use textwrap::indent;
 
+use crate::media::{AudioDetail, ImageDetail, MediaDetail, TextDetail, TypesDetail, VideoDetail};
+
 use super::Media;
 use super::MediaType;
 
 impl Display for MediaType {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            MediaType::Image(v) => write!(f, "Image{}", if v.is_some() { "(Detailed)" } else { "" }),
-            MediaType::Text(v) => write!(f, "Text{}", if v.is_some() { "(Detailed)" } else { "" }),
-            MediaType::Audio(v) => write!(f, "Audio{}", if v.is_some() { "(Detailed)" } else { "" }),
-            MediaType::Video(v) => write!(f, "Video{}", if v.is_some() { "(Detailed)" } else { "" }),
-            MediaType::Other(v) => write!(f, "Other{}", if v.is_some() { "(Detailed)" } else { "" }),
+            MediaType::Image => write!(f, "Image"),
+            MediaType::Text => write!(f, "Text"),
+            MediaType::Audio => write!(f, "Audio"),
+            MediaType::Video => write!(f, "Video"),
+            MediaType::Other => write!(f, "Other"),
             MediaType::None => write!(f, "None")
         }
     }
@@ -47,9 +49,54 @@ impl Display for Media {
         if let Some(v) = &self.comment {
             s.push_str(&format!("Comment: {}\n", v));
         }
+        if let Some(v) = &self.detail {
+            s.push_str(&format!("Details: \n{}", indent(&format!("{}", v), "    ")));
+        }
         s.push_str(&format!("File path: {}", self.filepath));
 
         write!(f, "{}", s)
     }
 }
 
+impl Display for MediaDetail {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(f, "{}\n", self.detail)?;
+        write!(f, "Other details: {}", serde_json::to_string_pretty(&self.other).unwrap())
+    }
+}
+
+impl Display for TypesDetail {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        match self {
+            TypesDetail::Image(v) => write!(f, "{}", v),
+            TypesDetail::Video(v) => write!(f, "{}", v),
+            TypesDetail::Audio(v) => write!(f, "{}", v),
+            TypesDetail::Text(v) => write!(f, "{}", v),
+            TypesDetail::Other => write!(f, "Other has no specified detail field.")
+        }
+    }
+}
+
+impl Display for ImageDetail {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(f, "Image Resolution: {} x {}\nImage Format: {}", self.width, self.height, self.format)
+    }
+}
+
+impl Display for TextDetail {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        unimplemented!()
+    }
+}
+
+impl Display for AudioDetail {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        unimplemented!()
+    }
+}
+
+impl Display for VideoDetail {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        unimplemented!()
+    }
+}

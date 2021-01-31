@@ -8,6 +8,7 @@ mod media;
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
     use std::fs;
     use std::io::Read;
     use std::thread;
@@ -21,23 +22,33 @@ mod tests {
 
     #[test]
     fn it_works() {
+        let mut lib = Library::open("test.mlib".to_string()).expect("?");
+        println!("{}", lib);
+        let t1 = lib.get_media(1).unwrap();
+        println!("{}", t1);
+        let mut t1 = t1.detailed(HashMap::new());
+        println!("{}", t1);
+        lib.update_media(&mut t1);
+    }
+
+    // #[test]
+    fn __it_works() {
         fs::remove_dir_all("test.mlib");
         let mut lib = match Library::create(".".to_string(), "test".to_string(), None, Some("Mass".to_string())) {
             Ok(mut v) => {
-                let id1 = v.add_media("test/1.jpg".to_string(), MediaType::Image(None), None, None, None, None).expect("??");
-                let id2 = v.add_media("test/2.jpg".to_string(), MediaType::Image(None), None, None, None, None).expect("??");
-                let id3 = v.add_media("test/3.jpg".to_string(), MediaType::Image(None), None, None, None, None).expect("??");
+                let id1 = v.add_media("test/1.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
+                let id2 = v.add_media("test/2.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
+                let id3 = v.add_media("test/3.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
                 v.remove_media(id2);
-                let id2 = v.add_media("test/2.jpg".to_string(), MediaType::Image(None), None, None, None, None).expect("??");
-                let id4 = v.add_media("test/4.jpg".to_string(), MediaType::Image(None), None, None, None, None).expect("??");
-                let id5 = v.add_media("test/5.jpg".to_string(), MediaType::Image(None), None, None, None, None).expect("??");
+                let id2 = v.add_media("test/2.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
+                let id4 = v.add_media("test/4.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
+                let id5 = v.add_media("test/5.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
                 let series_uuid = v.create_series(Some("test".to_string()), Some("for_test".to_string())).unwrap();
                 println!("Create new series with uuid: {}", series_uuid);
                 v.add_to_series(id1, &series_uuid, 9);
                 v.add_to_series(id2, &series_uuid, 2);
                 v.add_to_series(id3, &series_uuid, 4);
                 v.add_to_series(id4, &series_uuid, 6);
-                v.update_media(id1, MediaUpdateKey::Comment, "Test".to_string()).expect("??");
                 v.remove_from_series(id2);
                 v.trim_series_no(&series_uuid);
 
@@ -54,7 +65,7 @@ mod tests {
                         let adding = || {
                             let f = f.unwrap().path().to_str().unwrap().to_string();
                             print!("Adding {} ...", &f);
-                            match v.add_media(f.clone(), MediaType::Image(None), None, None, None, None) {
+                            match v.add_media(f.clone(), MediaType::Image, None, None, None, None) {
                                 Err(e) => println!("Error when adding {}: {}", f, e),
                                 Ok(_) => println!("Done"),
                             }

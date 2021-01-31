@@ -2,7 +2,8 @@ use std::{any, collections, env, fmt, fs, io, ops, path, str};
 
 use chrono::{DateTime, Local};
 use num::FromPrimitive;
-use rusqlite::{Connection, params, Params, params_from_iter, ToSql};
+use rusqlite::{Connection, Params, params_from_iter, ToSql};
+use rusqlite::params;
 use textwrap::indent;
 
 use crate::media::*;
@@ -130,9 +131,8 @@ impl Library {
 
                 CREATE TABLE media_detail(
                     id INTEGER PRIMARY KEY NOT NULL UNIQUE,
-                    format TEXT NOT NULL,
                     tags TEXT, /* Split by ',' */
-                    details TEXT, /* json format */
+                    details TEXT NOT NULl, /* json format */
                     FOREIGN KEY(id) REFERENCES media(id)
                 );
 
@@ -195,11 +195,7 @@ impl Library {
         let file_hash = self.hash_algo.do_hash(media_path.to_str().unwrap().to_string())?;
         let file_name = media_path.file_name().unwrap().to_str().unwrap();
         let file_ext = media_path.extension().unwrap().to_str().unwrap();
-        let new_path = path::PathBuf::new()
-            .join(self.path.as_str())
-            .join(&self.media_folder)
-            .join(&file_hash[..2])
-            .join(format!("{}.{}", &file_hash[2..], file_ext));
+        let new_path = self.get_media_path_by_hash(&file_hash, file_ext);
         if new_path.exists() {
             return Err(Error::AlreadyExists(new_path.to_str().unwrap().to_string()));
         }
@@ -228,11 +224,7 @@ impl Library {
         )?;
         let ext: Vec<&str> = file_name.split('.').collect();
         let ext = ext[ext.len() - 1];
-        let media_file = path::PathBuf::new()
-            .join(self.path.as_str())
-            .join(&self.media_folder)
-            .join(&file_hash[..2])
-            .join(format!("{}.{}", &file_hash[2..], ext));
+        let media_file = self.get_media_path_by_hash(&file_hash, ext);
         println!("{}", media_file.to_str().unwrap().to_string());
         if !media_file.is_file() {
             panic!("Media file is not exists or not a regular file.");
@@ -247,10 +239,67 @@ impl Library {
         Ok(())
     }
 
-    pub fn update_media(&mut self, id: u64, key: MediaUpdateKey, value: String) -> Result<()> {
+    pub fn update_media(&mut self, media: &mut Media) -> Result<()> {
+        let is_hash_changed: bool = self.db.query_row(
+            "SELECT hash != ? FROM media WHERE id = ?;",
+            params![&media.hash, media.id],
+            |row| Ok(row.get(0)?),
+        )?;
+        if is_hash_changed {
+
+            // changing hash means to merge two media. if there is no media targeting changed hash
+            // we fall. Btw, we tend to keep original media infos instead new one but set filename
+            // to the new.
+            let is_that_media_exists: bool = self.db.query_row(
+                "SELECT EXISTS(SELECT 1 FROM media WHERE hash = ?);",
+                params![&media.hash],
+                |row| Ok(row.get(0)?),
+            )?;
+            if !is_that_media_exists {
+                return Err(Error::NotExists(format!("Media with Hash {} do not exists.", media.hash)));
+            }
+            fs::remove_file(&media.filepath)?;
+            self.summary.media_size -= media.filesize;
+            self.summary.media_count -= 1;
+            let new_id: u64 = self.db.query_row(
+                "SELECT id FROM media WHERE hash = ?;",
+                params![&media.hash],
+                |row| Ok(row.get(0)?),
+            )?;
+            let new_media = self.get_media(new_id)?;
+            media.filesize = new_media.filesize;
+            media.filename = new_media.filename;
+            media.filepath = new_media.filepath;
+            self.db.execute(
+                "DELETE FROM media WHERE id = ?;",
+                params![new_media.id],
+            )?; // drop new media from database
+        }
+        if let Some(detail) = &media.detail {
+            let is_detail_exists: bool = self.db.query_row(
+                "SELECT EXISTS(SELECT 1 FROM media_detail WHERE id = ?);",
+                params![media.id],
+                |row| Ok(row.get(0)?),
+            )?;
+            if is_detail_exists {
+                self.db.execute(
+                    "UPDATE media_detail SET details = ? WHERE id = ?;",
+                    params![serde_json::to_string(detail)?, media.id],
+                )?;
+            } else {
+                self.db.execute(
+                    "INSERT INTO media_detail (id, details) VALUES (?, ?);",
+                    params![media.id, serde_json::to_string(detail)?],
+                )?;
+            }
+        }
         self.db.execute(
-            format!("UPDATE media SET {} = ? WHERE id = ?;", key.to_key()).as_str(),
-            params![value, id],
+            "UPDATE media
+                  SET hash = ?, filename = ?, filesize = ?, caption = ?, type = ?, sub_type = ?, type_addition = ?, comment = ?
+                  WHERE id = ?;",
+            params![media.hash, media.filename, media.filesize,
+                            media.caption, media.kind, media.sub_kind,
+                            media.kind_addition, media.comment, media.id],
         )?;
         Ok(())
     }
@@ -427,6 +476,7 @@ impl Library {
                             series_uuid: row.get(8)?,
                             series_no: row.get(9)?,
                             comment: row.get(10)?,
+                            detail: None,
                         })
                     },
             )?;
@@ -436,9 +486,21 @@ impl Library {
             params![id],
             |row| Ok(row.get(0)?),
         )?;
+        if is_detailed && media.kind.is_some() {
+            let detail: String = self.db.query_row(
+                "SELECT details FROM media_detail WHERE id = ?;",
+                params![id],
+                |row| Ok(row.get(0)?),
+            )?;
+
+            media.detail = Some(
+                serde_json::from_str(&detail)?
+            );
+        }
 
         Ok(media)
     }
+
 
     pub fn query_media(&self, sql_stmt: &str) -> Result<Vec<u64>> {
         unimplemented!()
@@ -476,5 +538,17 @@ impl fmt::Display for Library {
                self.path,
                self.schema,
                indent(&format!("{}", self.summary), "    |-"))
+    }
+}
+
+impl Library {
+    // private method
+    fn get_media_path_by_hash(&self, hash: &str, ext: &str) -> path::PathBuf {
+        // this method do not promise the existence.
+        path::PathBuf::new()
+            .join(self.path.as_str())
+            .join(&self.media_folder)
+            .join(&hash[..2])
+            .join(format!("{}.{}", &hash[2..], ext))
     }
 }

@@ -31,6 +31,7 @@ pub enum Error {
     LockError(LockError),
     JsonError(serde_json::Error),
     Other(String),
+    MediaDecode(String),
     NoneError,
 }
 

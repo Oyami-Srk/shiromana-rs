@@ -10,29 +10,14 @@ pub enum MediaUpdateKey {
 }
 
 pub enum MediaType {
-    Image(Option<ImageDetail>),
-    // = 1,
-    Text(Option<TextDetail>),
-    // = 2,
-    Audio(Option<AudioDetail>),
-    // = 3,
-    Video(Option<VideoDetail>),
-    // = 4,
-    Other(Option<String>),
-    // = 10,
-    None,
-    // = 99999, for type is not sure or not decided yet.
+    Image = 1,
+    Text = 2,
+    Audio = 3,
+    Video = 4,
+    Other = 10,
+    None = 99999,
 }
 
-pub mod types {
-    use super::MediaType;
-
-    pub const IMAGE: MediaType = MediaType::Image(None);
-    pub const TEXT: MediaType = MediaType::Text(None);
-    pub const AUDIO: MediaType = MediaType::Audio(None);
-    pub const VIDEO: MediaType = MediaType::Video(None);
-    pub const OTHER: MediaType = MediaType::Other(None);
-}
 
 impl MediaUpdateKey {
     pub fn to_key(&self) -> String {
@@ -48,38 +33,52 @@ impl MediaUpdateKey {
 
 pub struct Media {
     pub(crate) id: u64,
-    pub(crate) library_uuid: super::misc::Uuid,
-    pub(crate) hash: String,
-    pub(crate) filename: String,
-    pub(crate) filepath: String,
+    pub library_uuid: super::misc::Uuid,
+    pub hash: String,
+    pub filename: String,
+    pub filepath: String,
     pub(crate) filesize: usize,
-    pub(crate) caption: Option<String>,
+    pub caption: Option<String>,
     pub(crate) time_add: chrono::DateTime<chrono::Local>,
-    pub(crate) kind: MediaType,
-    pub(crate) sub_kind: Option<String>,
-    pub(crate) kind_addition: Option<String>,
+    pub kind: MediaType,
+    pub sub_kind: Option<String>,
+    pub kind_addition: Option<String>,
     pub(crate) series_uuid: Option<super::misc::Uuid>,
     pub(crate) series_no: Option<u64>,
-    pub(crate) comment: Option<String>,
+    pub comment: Option<String>,
+    pub detail: Option<MediaDetail>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+pub struct MediaDetail {
+    detail: TypesDetail,
+    other: std::collections::HashMap<String, String>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+pub enum TypesDetail {
+    Image(ImageDetail),
+    Video(VideoDetail),
+    Audio(AudioDetail),
+    Text(TextDetail),
+    Other,
 }
 
 
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub struct ImageDetail {
-    height: u64,
-    width: u64,
-    // dpi stores like x, y
-    dpi: (u8, u8),
-    author: Option<String>,
-    address: Option<String>,
+    height: u32,
+    width: u32,
+    format: String,
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub struct TextDetail {
     words: usize,
     language: String,
-    author: Option<String>,
-    address: Option<String>,
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub struct VideoDetail {
     height: u64,
     width: u64,
@@ -87,9 +86,11 @@ pub struct VideoDetail {
     // In second
     frame_rates: u64,
     codec: String,
-    bit_rates: u64, // In bit per second
+    bit_rates: u64,
+    // In bit per second
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub struct AudioDetail {
     time_len: u64,
     codec: String,
@@ -102,7 +103,6 @@ pub struct AddingMediaParam {
     sub_kind: Option<String>,
     kind_addition: Option<String>,
     comment: Option<String>,
-    is_series: bool,
     series_title: Option<String>,
     series_no: Option<u64>,
 }
@@ -115,7 +115,6 @@ impl Default for AddingMediaParam {
             sub_kind: None,
             kind_addition: None,
             comment: None,
-            is_series: false,
             series_title: None,
             series_no: None,
         }

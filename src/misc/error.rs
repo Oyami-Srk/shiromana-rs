@@ -25,7 +25,8 @@ impl std::fmt::Display for Error {
             Locked(s) => write!(f, "Resource \"{}\" is locked.", s),
             LockError(s) => write!(f, "{}", s),
             JsonError(e) => write!(f, "Error when processing json. {}", e),
-            NoneError => write!(f, "Some values goes none.") // TODO: indicated error msg
+            NoneError => write!(f, "Some values goes none."), // TODO: indicated error msg
+            MediaDecode(s) => write!(f, "Media decode error: {}", s)
         }
     }
 }
@@ -50,4 +51,10 @@ impl From<serde_json::Error> for Error {
 
 impl From<::uuid::Error> for Error {
     fn from(err: ::uuid::Error) -> Self { Error::Other(format!("UUID error: {}", err)) }
+}
+
+impl From<image::ImageError> for Error {
+    fn from(err: image::ImageError) -> Self {
+        Error::MediaDecode(format!("{}", err))
+    }
 }
