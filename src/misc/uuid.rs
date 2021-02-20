@@ -1,4 +1,5 @@
 use std::fmt::Formatter;
+use std::hash::{Hash, Hasher};
 
 use ::uuid::Uuid as _Uuid;
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, ValueRef};

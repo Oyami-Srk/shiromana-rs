@@ -14,7 +14,7 @@ pub struct Library {
     pub(crate) db: rusqlite::Connection,
     shared_db: rusqlite::Connection,
     path: String,
-    pub(crate) uuid: super::misc::Uuid,
+    pub uuid: super::misc::Uuid,
     library_name: String,
     master_name: Option<String>,
     schema: String,

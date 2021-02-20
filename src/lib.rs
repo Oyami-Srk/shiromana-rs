@@ -1,10 +1,9 @@
 #![allow(dead_code, unused)]
 
-use uuid::Uuid;
 
-mod misc;
-mod library;
-mod media;
+pub mod misc;
+pub mod library;
+pub mod media;
 
 #[cfg(test)]
 mod tests {
@@ -20,7 +19,7 @@ mod tests {
     use crate::media::*;
     use crate::misc::*;
 
-    #[test]
+    // #[test]
     fn it_works() {
         let mut lib = Library::open("test.mlib".to_string()).expect("?");
         println!("{}", lib);
@@ -31,7 +30,7 @@ mod tests {
         lib.update_media(&mut t1);
     }
 
-    // #[test]
+    #[test]
     fn __it_works() {
         fs::remove_dir_all("test.mlib");
         let mut lib = match Library::create(".".to_string(), "test".to_string(), None, Some("Mass".to_string())) {

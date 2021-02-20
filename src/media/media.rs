@@ -72,6 +72,20 @@ impl MediaType {
     }
 }
 
+impl From<&str> for MediaType {
+    fn from(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "image" => Self::Image,
+            "text" => Self::Text,
+            "audio" => Self::Audio,
+            "video" => Self::Video,
+            "other" => Self::Other,
+            "none" => Self::None,
+            _ => Self::Other
+        }
+    }
+}
+
 
 impl From<MediaType> for u32 {
     fn from(v: MediaType) -> Self {

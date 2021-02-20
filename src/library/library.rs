@@ -208,7 +208,6 @@ impl Library {
             params![file_hash, file_name, &file_size, caption, kind, sub_kind, kind_addition, comment],
         )?;
         let id = self.db.last_insert_rowid() as u64;
-        // TODO: return a media type when impl media mod
         self.summary.media_count += 1;
         self.summary.media_size += file_size as usize;
         Ok(id)

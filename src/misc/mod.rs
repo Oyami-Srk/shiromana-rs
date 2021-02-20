@@ -80,7 +80,7 @@ pub enum HashAlgo {
     SHA256,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd, Copy)]
 pub struct Uuid(::uuid::Uuid);
 
 mod error;

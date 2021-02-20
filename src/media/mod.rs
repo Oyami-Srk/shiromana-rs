@@ -9,6 +9,7 @@ pub enum MediaUpdateKey {
     Comment,
 }
 
+#[derive(Clone)]
 pub enum MediaType {
     Image = 1,
     Text = 2,
@@ -103,6 +104,7 @@ pub struct AddingMediaParam {
     sub_kind: Option<String>,
     kind_addition: Option<String>,
     comment: Option<String>,
+    // title here must be unique
     series_title: Option<String>,
     series_no: Option<u64>,
 }
