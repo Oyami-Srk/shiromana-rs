@@ -1,5 +1,6 @@
 use std::fmt::Formatter;
 use std::hash::{Hash, Hasher};
+use std::str::FromStr;
 
 use ::uuid::Uuid as _Uuid;
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
@@ -14,10 +15,14 @@ impl Uuid {
     pub fn new_v4() -> Uuid {
         Uuid(_Uuid::new_v4())
     }
+}
 
-    pub fn from_str(s: &str) -> Result<Uuid> {
+impl FromStr for Uuid {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
         if s.len() == 0 {
-            return Err(Error::NoneError);
+            return Err(Error::NotMatch("Uuid format".to_string()));
         }
         Ok(Uuid(_Uuid::parse_str(s)?))
     }

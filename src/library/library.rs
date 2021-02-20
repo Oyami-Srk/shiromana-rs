@@ -60,7 +60,7 @@ impl Library {
             db,
             shared_db,
             path,
-            uuid: Uuid::from_str(library_uuid.as_str()).unwrap(),
+            uuid: library_uuid.as_str().parse().unwrap(),
             library_name: metadata.library_name,
             master_name: metadata.master_name,
             media_folder: metadata.media_folder,
