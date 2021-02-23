@@ -28,6 +28,12 @@ impl FromStr for Uuid {
     }
 }
 
+impl Into<String> for Uuid {
+    fn into(self) -> String {
+        self.to_string()
+    }
+}
+
 impl ToSql for Uuid {
     fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
         Ok(ToSqlOutput::from(self.to_string()))

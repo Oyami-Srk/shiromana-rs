@@ -12,6 +12,7 @@ mod tests {
     use std::io::Read;
     use std::thread;
 
+    use serde_json::Serializer;
     use sha1::{Digest, Sha1};
     use uuid::Uuid;
 
@@ -19,7 +20,7 @@ mod tests {
     use crate::media::*;
     use crate::misc::*;
 
-    // #[test]
+    #[test]
     fn it_works() {
         let mut lib = Library::open("test.mlib".to_string()).expect("?");
         println!("{}", lib);
@@ -27,10 +28,11 @@ mod tests {
         println!("{}", t1);
         let mut t1 = t1.detailed(HashMap::new());
         println!("{}", t1);
+        println!("{}", serde_json::to_string_pretty(&t1).unwrap());
         lib.update_media(&mut t1);
     }
 
-    #[test]
+    // #[test]
     fn __it_works() {
         fs::remove_dir_all("test.mlib");
         let mut lib = match Library::create(".".to_string(), "test".to_string(), None, Some("Mass".to_string())) {

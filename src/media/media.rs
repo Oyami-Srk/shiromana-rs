@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::path;
+use std::str::FromStr;
 
 use chrono::{DateTime, FixedOffset, Local, Utc};
 use image::GenericImageView;
@@ -9,7 +10,9 @@ use num::FromPrimitive;
 use num_traits::{AsPrimitive, ToPrimitive};
 use rusqlite::params;
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
-use serde::__private::TryFrom;
+use serde::{Deserializer, Serializer};
+use serde::__private::{Formatter, TryFrom};
+use serde::de::Visitor;
 
 use super::{*};
 use super::super::library::Library;
@@ -71,21 +74,6 @@ impl MediaType {
         }
     }
 }
-
-impl From<&str> for MediaType {
-    fn from(s: &str) -> Self {
-        match s.to_lowercase().as_str() {
-            "image" => Self::Image,
-            "text" => Self::Text,
-            "audio" => Self::Audio,
-            "video" => Self::Video,
-            "other" => Self::Other,
-            "none" => Self::None,
-            _ => Self::Other
-        }
-    }
-}
-
 
 impl From<MediaType> for u32 {
     fn from(v: MediaType) -> Self {
@@ -188,5 +176,21 @@ impl GetDetail for AudioDetail {
 impl GetDetail for VideoDetail {
     fn get_detail(media_path: &str) -> Result<TypesDetail> {
         unimplemented!()
+    }
+}
+
+impl std::str::FromStr for MediaType {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        Ok(match s.to_lowercase().as_str() {
+            "image" => Self::Image,
+            "text" => Self::Text,
+            "audio" => Self::Audio,
+            "video" => Self::Video,
+            "other" => Self::Other,
+            "none" => Self::None,
+            _ => Self::Other
+        })
     }
 }

@@ -9,7 +9,7 @@ pub enum MediaUpdateKey {
     Comment,
 }
 
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub enum MediaType {
     Image = 1,
     Text = 2,
@@ -32,6 +32,7 @@ impl MediaUpdateKey {
     }
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct Media {
     pub(crate) id: u64,
     pub library_uuid: super::misc::Uuid,
