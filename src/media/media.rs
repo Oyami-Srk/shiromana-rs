@@ -1,22 +1,12 @@
 use std::collections::HashMap;
-use std::path;
-use std::str::FromStr;
 
-use chrono::{DateTime, FixedOffset, Local, Utc};
-use image::GenericImageView;
 use image::ImageFormat;
 use image::io::Reader as ImageReader;
-use num::FromPrimitive;
-use num_traits::{AsPrimitive, ToPrimitive};
-use rusqlite::params;
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
-use serde::{Deserializer, Serializer};
-use serde::__private::{Formatter, TryFrom};
-use serde::de::Visitor;
+use serde::__private::TryFrom;
 
 use super::{*};
-use super::super::library::Library;
-use super::super::misc::{Error, Result, Uuid};
+use super::super::misc::{Error, Result};
 
 impl Media {
     pub fn detailed(self, other: HashMap<String, String>) -> Media {
@@ -163,18 +153,21 @@ impl GetDetail for ImageDetail {
 
 impl GetDetail for TextDetail {
     fn get_detail(media_path: &str) -> Result<TypesDetail> {
+        let _ = media_path;
         unimplemented!()
     }
 }
 
 impl GetDetail for AudioDetail {
     fn get_detail(media_path: &str) -> Result<TypesDetail> {
+        let _ = media_path;
         unimplemented!()
     }
 }
 
 impl GetDetail for VideoDetail {
     fn get_detail(media_path: &str) -> Result<TypesDetail> {
+        let _ = media_path;
         unimplemented!()
     }
 }

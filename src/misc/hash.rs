@@ -48,17 +48,17 @@ impl HashAlgo {
         Ok(match self {
             HashAlgo::MD5 => {
                 let mut hasher = Md5::new();
-                std::io::copy(&mut file, &mut hasher);
+                std::io::copy(&mut file, &mut hasher)?;
                 format!("{:X}", hasher.finalize())
             }
             HashAlgo::SHA1 => {
                 let mut hasher = Sha1::new();
-                std::io::copy(&mut file, &mut hasher);
+                std::io::copy(&mut file, &mut hasher)?;
                 format!("{:X}", hasher.finalize())
             }
             HashAlgo::SHA256 => {
                 let mut hasher = Sha256::new();
-                std::io::copy(&mut file, &mut hasher);
+                std::io::copy(&mut file, &mut hasher)?;
                 format!("{:X}", hasher.finalize())
             }
         })

@@ -1,16 +1,14 @@
-use std::{any, collections, env, fmt, fs, io, ops, path, str};
+use std::{env, fmt, fs, path, str};
 
-use chrono::{DateTime, Local};
-use num::FromPrimitive;
-use rusqlite::{Connection, Params, params_from_iter, ToSql};
+use rusqlite::Connection;
 use rusqlite::params;
 use textwrap::indent;
 
 use crate::media::*;
 
 use super::{Library, LibraryMetadata, LibrarySummary};
-use super::super::media::{MediaType, MediaUpdateKey};
-use super::super::misc::{config, Error, HashAlgo, Lock, LockError, LockStatus, LockType, Result, tools, Uuid};
+use super::super::media::MediaType;
+use super::super::misc::{config, Error, HashAlgo, Lock, LockType, Result, tools, Uuid};
 
 impl Library {
     pub fn open(path: String) -> Result<Library> {
@@ -54,7 +52,7 @@ impl Library {
         let db = Connection::open(config::DATABASE_FN)?;
         let shared_db = Connection::open(config::SHARED_DATABASE_FN)?;
         let path = std::env::current_dir()?.to_str().unwrap().to_string();
-        std::env::set_current_dir(current_workdir);
+        std::env::set_current_dir(current_workdir)?;
 
         Ok(Library {
             db,
@@ -162,7 +160,7 @@ impl Library {
             params![&library_uuid, env::current_dir()?.to_str()],
         )?;
         let shared_db = Connection::open(config::SHARED_DATABASE_FN)?;
-        fs::create_dir(&media_folder);
+        fs::create_dir(&media_folder)?;
         env::set_current_dir(current_dir)?;
         let library_path = library_path.canonicalize()?;
 
@@ -231,8 +229,8 @@ impl Library {
         self.db.execute(
             "DELETE FROM media WHERE id = ?;",
             params![id],
-        );
-        fs::remove_file(media_file);
+        )?;
+        fs::remove_file(media_file)?;
         self.summary.media_size -= file_size;
         self.summary.media_count -= 1;
         Ok(())
@@ -502,10 +500,12 @@ impl Library {
 
 
     pub fn query_media(&self, sql_stmt: &str) -> Result<Vec<u64>> {
+        let _ = sql_stmt;
         unimplemented!()
     }
 
     pub fn query_series(&self, sql_stmt: &str) -> Result<Vec<Uuid>> {
+        let _ = sql_stmt;
         unimplemented!()
     }
 }

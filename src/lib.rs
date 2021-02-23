@@ -1,19 +1,14 @@
-#![allow(dead_code, unused)]
-
-
 pub mod misc;
 pub mod library;
 pub mod media;
 
 #[cfg(test)]
+#[allow(dead_code, unused)]
 mod tests {
     use std::collections::HashMap;
     use std::fs;
-    use std::io::Read;
-    use std::thread;
 
-    use serde_json::Serializer;
-    use sha1::{Digest, Sha1};
+    use sha1::Digest;
     use uuid::Uuid;
 
     use crate::library::*;
@@ -35,7 +30,7 @@ mod tests {
     // #[test]
     fn __it_works() {
         fs::remove_dir_all("test.mlib");
-        let mut lib = match Library::create(".".to_string(), "test".to_string(), None, Some("Mass".to_string())) {
+        let lib = match Library::create(".".to_string(), "test".to_string(), None, Some("Mass".to_string())) {
             Ok(mut v) => {
                 let id1 = v.add_media("test/1.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
                 let id2 = v.add_media("test/2.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");

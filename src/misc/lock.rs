@@ -2,7 +2,6 @@
 
 use std::fmt::Formatter;
 use std::fs;
-use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use super::*;

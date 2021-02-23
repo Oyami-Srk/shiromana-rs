@@ -99,6 +99,7 @@ pub struct AudioDetail {
     bit_rates: u64,
 }
 
+#[allow(dead_code)]
 pub struct AddingMediaParam {
     caption: Option<String>,
     kind: MediaType,

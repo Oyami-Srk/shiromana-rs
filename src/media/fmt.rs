@@ -85,18 +85,21 @@ impl Display for ImageDetail {
 
 impl Display for TextDetail {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        let _ = f;
         unimplemented!()
     }
 }
 
 impl Display for AudioDetail {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        let _ = f;
         unimplemented!()
     }
 }
 
 impl Display for VideoDetail {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        let _ = f;
         unimplemented!()
     }
 }

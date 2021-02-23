@@ -1,5 +1,4 @@
 use std::fmt::Formatter;
-use std::hash::{Hash, Hasher};
 use std::str::FromStr;
 
 use ::uuid::Uuid as _Uuid;
