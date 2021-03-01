@@ -41,10 +41,10 @@ mod tests {
                 let id5 = v.add_media("test/5.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
                 let series_uuid = v.create_series(Some("test".to_string()), Some("for_test".to_string())).unwrap();
                 println!("Create new series with uuid: {}", series_uuid);
-                v.add_to_series(id1, &series_uuid, 9);
-                v.add_to_series(id2, &series_uuid, 2);
-                v.add_to_series(id3, &series_uuid, 4);
-                v.add_to_series(id4, &series_uuid, 6);
+                v.add_to_series(id1, &series_uuid, Some(9));
+                v.add_to_series(id2, &series_uuid, Some(2));
+                v.add_to_series(id3, &series_uuid, Some(4));
+                v.add_to_series(id4, &series_uuid, Some(6));
                 v.remove_from_series(id2);
                 v.trim_series_no(&series_uuid);
 

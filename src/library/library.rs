@@ -324,7 +324,7 @@ impl Library {
         Ok(())
     }
 
-    pub fn add_to_series(&mut self, id: u64, uuid: &Uuid, no: u64) -> Result<()> {
+    pub fn add_to_series(&mut self, id: u64, uuid: &Uuid, no: Option<u64>) -> Result<()> {
         let mut stmt = self.db.prepare(
             "SELECT series_no FROM media WHERE series_uuid = ?1 AND id != ?2;"
         )?;
@@ -334,10 +334,20 @@ impl Library {
                 row.get(0)
             })?;
         let to_check: Vec<u64> = iter.map(|x| x.unwrap()).collect();
-        if to_check.iter().any(|i| { *i == no }) {
-            return Err(Error::Occupied(format!("occupied when add media(id {}) to series {} with no {}", id, uuid, no)));
-        }
-        println!("{:?}", to_check);
+        let no = if let Some(no) = no {
+            // if the no is specified.
+            if to_check.iter().any(|i| { *i == no }) {
+                return Err(Error::Occupied(format!("occupied when add media(id {}) to series {} with no {}", id, uuid, no)));
+            }
+            no
+        } else {
+            // or not, we use the biggest no in the to_check list +1 to be the no
+            let biggest = to_check.iter().max();
+            match biggest {
+                Some(m) => m + 1,
+                None => 1
+            }
+        };
         self.db.execute(
             "UPDATE media SET series_uuid = ?, series_no = ? WHERE id = ?;",
             params![uuid, no, id],
