@@ -1,6 +1,7 @@
 use std::fmt::Formatter;
 use std::fs;
 
+use blake3;
 use md5::Md5;
 use sha1::{Digest, Sha1};
 use sha2::Sha256;
@@ -12,7 +13,8 @@ impl std::fmt::Debug for HashAlgo {
         match self {
             HashAlgo::MD5 => write!(f, "MD5"),
             HashAlgo::SHA1 => write!(f, "SHA1"),
-            HashAlgo::SHA256 => write!(f, "SHA256")
+            HashAlgo::SHA256 => write!(f, "SHA256"),
+            HashAlgo::BLAKE3 => write!(f, "BLAKE3"),
         }
     }
 }
@@ -22,7 +24,8 @@ impl HashAlgo {
         match self {
             HashAlgo::MD5 => "MD5".to_string(),
             HashAlgo::SHA1 => "SHA1".to_string(),
-            HashAlgo::SHA256 => "SHA256".to_string()
+            HashAlgo::SHA256 => "SHA256".to_string(),
+            HashAlgo::BLAKE3 => "BLAKE3".to_string(),
         }
     }
 
@@ -31,6 +34,7 @@ impl HashAlgo {
             "MD5" => Ok(HashAlgo::MD5),
             "SHA1" => Ok(HashAlgo::SHA1),
             "SHA256" => Ok(HashAlgo::SHA256),
+            "BLAKE3" => Ok(HashAlgo::BLAKE3),
             _ => return Err(Error::NotExists(format!("Hash algo not exists: {}", s)))
         }
     }
@@ -58,6 +62,11 @@ impl HashAlgo {
             }
             HashAlgo::SHA256 => {
                 let mut hasher = Sha256::new();
+                std::io::copy(&mut file, &mut hasher)?;
+                format!("{:X}", hasher.finalize())
+            }
+            HashAlgo::BLAKE3 => {
+                let mut hasher = blake3::Hasher::new();
                 std::io::copy(&mut file, &mut hasher)?;
                 format!("{:X}", hasher.finalize())
             }

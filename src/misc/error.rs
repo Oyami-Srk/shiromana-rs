@@ -9,7 +9,7 @@ impl std::fmt::Display for Error {
         use self::Error::*;
         match &self {
             NotExists(s) =>
-                write!(f, "{} is not exists.", s),
+                write!(f, "{} is not exists", s),
             AlreadyExists(s) =>
                 write!(f, "{} is already exists.", s),
             NotMatch(s) =>

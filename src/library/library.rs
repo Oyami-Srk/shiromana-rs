@@ -195,6 +195,7 @@ impl Library {
         let file_ext = media_path.extension().unwrap().to_str().unwrap();
         let new_path = self.get_media_path_by_hash(&file_hash, file_ext);
         if new_path.exists() {
+            // We believe that no collision on images
             return Err(Error::AlreadyExists(new_path.to_str().unwrap().to_string()));
         }
         fs::create_dir_all(new_path.parent().unwrap())?;

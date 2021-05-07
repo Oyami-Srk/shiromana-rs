@@ -15,7 +15,7 @@ mod tests {
     use crate::media::*;
     use crate::misc::*;
 
-    #[test]
+    // #[test]
     fn it_works() {
         let mut lib = Library::open("test.mlib".to_string()).expect("?");
         println!("{}", lib);
@@ -27,7 +27,7 @@ mod tests {
         lib.update_media(&mut t1);
     }
 
-    // #[test]
+    #[test]
     fn __it_works() {
         fs::remove_dir_all("test.mlib");
         let lib = match Library::create(".".to_string(), "test".to_string(), None, Some("Mass".to_string())) {
@@ -53,7 +53,7 @@ mod tests {
                 let media2 = v.get_media(id2).unwrap();
                 println!("Media Info ( ID {} ):\n{}", id1, textwrap::indent(&format!("{}", media1), "    "));
                 println!("Media Info ( ID {} ):\n{}", id2, textwrap::indent(&format!("{}", media2), "    "));
-                if false {
+                if true {
                     println!("Trying to adding huge amount of files.");
                     let begin = chrono::Local::now();
                     let files = fs::read_dir("test/Fatkun").unwrap();

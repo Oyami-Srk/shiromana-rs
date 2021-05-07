@@ -11,7 +11,8 @@ pub mod config {
     pub const MEDIAS_HASH_LEVEL: u32 = 1;
     // max files is only for warning
     pub const MEDIAS_FOLDER_MAX_FILES: u32 = 10000;
-    pub const DEFAULT_HASH_ALGO: &str = "MD5";
+    // pub const DEFAULT_HASH_ALGO: &str = "MD5";
+    pub const DEFAULT_HASH_ALGO: &str = "BLAKE3";
     pub const LOCKFILE: &str = ".LOCK";
 }
 
@@ -78,6 +79,7 @@ pub enum HashAlgo {
     MD5,
     SHA1,
     SHA256,
+    BLAKE3,
 }
 
 #[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd, Copy, serde::Serialize, serde::Deserialize)]
