@@ -28,6 +28,14 @@ mod tests {
     }
 
     #[test]
+    fn test_get_by_name() {
+        let mut lib = Library::open("test.mlib".to_string()).expect("?");
+        dbg!(lib.get_media_by_filename("test_1.2.309090".to_string()));
+        dbg!(lib.query_media("hash = 'AAA'"));
+        println!("{}", lib.get_media(99999).unwrap().to_string());
+    }
+
+    // #[test]
     fn __it_works() {
         fs::remove_dir_all("test.mlib");
         let lib = match Library::create(".".to_string(), "test".to_string(), None, Some("Mass".to_string())) {

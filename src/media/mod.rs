@@ -34,19 +34,19 @@ impl MediaUpdateKey {
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Media {
-    pub(crate) id: u64,
+    pub id: u64,
     pub library_uuid: super::misc::Uuid,
     pub hash: String,
     pub filename: String,
     pub filepath: String,
-    pub(crate) filesize: usize,
+    pub filesize: usize,
     pub caption: Option<String>,
-    pub(crate) time_add: chrono::DateTime<chrono::Local>,
+    pub time_add: chrono::DateTime<chrono::Local>,
     pub kind: MediaType,
     pub sub_kind: Option<String>,
     pub kind_addition: Option<String>,
-    pub(crate) series_uuid: Option<super::misc::Uuid>,
-    pub(crate) series_no: Option<u64>,
+    pub series_uuid: Option<super::misc::Uuid>,
+    pub series_no: Option<u64>,
     pub comment: Option<String>,
     pub detail: Option<MediaDetail>,
 }

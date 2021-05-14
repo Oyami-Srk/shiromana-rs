@@ -72,4 +72,13 @@ impl HashAlgo {
             }
         })
     }
+
+    pub fn get_size(&self) -> usize {
+        match self {
+            HashAlgo::MD5 => Md5::output_size(),
+            HashAlgo::SHA1 => Sha1::output_size(),
+            HashAlgo::SHA256 => Sha256::output_size(),
+            HashAlgo::BLAKE3 => blake3::Hasher::output_size(),
+        }
+    }
 }

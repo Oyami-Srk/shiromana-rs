@@ -1,4 +1,5 @@
 use std::{env, fmt, fs, path, str};
+use std::path::Path;
 
 use rusqlite::Connection;
 use rusqlite::params;
@@ -509,15 +510,75 @@ impl Library {
         Ok(media)
     }
 
+    pub fn get_media_by_filename(&self, filename: String) -> Result<Vec<u64>> {
+        let mut result: Vec<u64> = vec![];
+        let id_fn: Vec<(u64, String)> = self.db.prepare(
+            "SELECT id, filename FROM media WHERE filename LIKE ? ESCAPE '\\';"
+        )?.query_map(
+            params![filename.replace("%", "\\%") + "%"],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?.map(|x| x.unwrap()).collect();
+        for v in id_fn.iter() {
+            if v.1 == filename {
+                result.push(v.0);
+            }
+        };
+        let id_fn: Vec<(u64, String)> = id_fn.iter().map(
+            |x| (x.0,
+                 Path::new(&x.1)
+                     .file_stem()
+                     .unwrap_or_default()
+                     .to_str()
+                     .unwrap_or("")
+                     .to_string()))
+            .collect();
+        for v in id_fn.iter() {
+            if v.1 == filename {
+                result.push(v.0);
+            }
+        };
+        Ok(result)
+    }
 
     pub fn query_media(&self, sql_stmt: &str) -> Result<Vec<u64>> {
-        let _ = sql_stmt;
-        unimplemented!()
+        Ok(
+            self.db.prepare(&format!("SELECT id FROM media WHERE {};", sql_stmt))?
+                .query_map(params![],
+                           |row| Ok(row.get(0)?))?
+                .map(|x| x.unwrap()).collect())
     }
 
     pub fn query_series(&self, sql_stmt: &str) -> Result<Vec<Uuid>> {
         let _ = sql_stmt;
         unimplemented!()
+    }
+
+    pub fn get_library_name(&self) -> &String {
+        &self.library_name
+    }
+
+    pub fn get_master_name(&self) -> &Option<String> {
+        &self.master_name
+    }
+
+    pub fn get_uuid(&self) -> &Uuid {
+        &self.uuid
+    }
+
+    pub fn get_path(&self) -> &String {
+        &self.path
+    }
+
+    pub fn get_schema(&self) -> &String {
+        &self.schema
+    }
+
+    pub fn get_summary(&self) -> &LibrarySummary {
+        &self.summary
+    }
+
+    pub fn get_hash_size(&self) -> usize {
+        self.hash_algo.get_size()
     }
 }
 
