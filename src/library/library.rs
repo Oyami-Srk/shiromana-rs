@@ -122,10 +122,7 @@ impl Library {
                     type INTEGER NOT NULL,
                     sub_type CHAR(32),
                     type_addition TEXT,
-                    series_uuid CHAR(36),
-                    series_no INTEGER,
-                    comment TEXT,
-                    FOREIGN KEY(series_uuid) REFERENCES series(uuid)
+                    comment TEXT
                 );
 
                 CREATE TABLE media_detail(
@@ -144,7 +141,7 @@ impl Library {
 
                 CREATE TABLE series(
                    uuid CHAR(36) PRIMARY KEY NOT NULL UNIQUE,
-                   caption TEXT,
+                   caption TEXT UNIQUE NOT NULL,
                    media_count INTEGER,
                    comment TEXT
                 );
@@ -153,6 +150,15 @@ impl Library {
                     uuid CHAR(36) PRIMARY KEY NOT NULL UNIQUE,
                     path TEXT NOT NULL,
                     comment TEXT
+                );
+
+                CREATE TABLE media_series_ref(
+                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
+                    media_id INTEGER NOT NULL,
+                    series_uuid CHAR(36) NOT NULL,
+                    series_no INTEGER,
+                    FOREIGN KEY(media_id) REFERENCES media(id),
+                    FOREIGN KEY(series_uuid) REFERENCES series(uuid)
                 );
                 ")?;
         db.execute(
@@ -197,7 +203,7 @@ impl Library {
         let new_path = self.get_media_path_by_hash(&file_hash, file_ext);
         if new_path.exists() {
             // We believe that no collision on images
-            return Err(Error::AlreadyExists(new_path.to_str().unwrap().to_string()));
+            return Err(Error::AlreadyExists(file_hash));
         }
         fs::create_dir_all(new_path.parent().unwrap())?;
         fs::copy(&media_path, &new_path)?;
@@ -303,7 +309,7 @@ impl Library {
         Ok(())
     }
 
-    pub fn create_series(&mut self, caption: Option<String>, comment: Option<String>) -> Result<Uuid> {
+    pub fn create_series(&mut self, caption: String, comment: Option<String>) -> Result<Uuid> {
         let uuid = Uuid::new_v4();
         self.db.execute(
             "INSERT INTO series (uuid, caption, comment, media_count) VALUES (?, ?, ?, 0);",
@@ -319,16 +325,25 @@ impl Library {
             params![uuid],
         )?;
         self.db.execute(
-            "UPDATE media SET series_uuid = NULL, series_no = NULL WHERE series_uuid = ?;",
+            "DELETE FROM media_series_ref WHERE series_uuid = ?;",
             params![uuid],
         )?;
         self.summary.series_count -= 1;
         Ok(())
     }
 
-    pub fn add_to_series(&mut self, id: u64, uuid: &Uuid, no: Option<u64>) -> Result<()> {
+    pub fn get_series_by_name(&self, caption: String) -> Result<Uuid> {
+        let uuid: Uuid = self.db.query_row(
+            "SELECT uuid FROM series WHERE caption = ?;",
+            params![caption],
+            |row| Ok(row.get(0)?),
+        )?;
+        Ok(uuid)
+    }
+
+    pub fn add_to_series(&mut self, id: u64, uuid: &Uuid, no: Option<u64>, unsorted: bool) -> Result<()> {
         let mut stmt = self.db.prepare(
-            "SELECT series_no FROM media WHERE series_uuid = ?1 AND id != ?2;"
+            "SELECT series_no FROM media_series_ref WHERE series_uuid = ?1 AND media_id != ?2;"
         )?;
         let iter = stmt.query_map(
             params![uuid, id],
@@ -341,18 +356,23 @@ impl Library {
             if to_check.iter().any(|i| { *i == no }) {
                 return Err(Error::Occupied(format!("occupied when add media(id {}) to series {} with no {}", id, uuid, no)));
             }
-            no
+            Some(no)
         } else {
-            // or not, we use the biggest no in the to_check list +1 to be the no
-            let biggest = to_check.iter().max();
-            match biggest {
-                Some(m) => m + 1,
-                None => 1
+            // or this is a unsorted media
+            if unsorted {
+                None
+            } else {
+                // or not, we use the biggest no in the to_check list +1 to be the no
+                let biggest = to_check.iter().max();
+                Some(match biggest {
+                    Some(m) => m + 1,
+                    None => 1
+                })
             }
         };
         self.db.execute(
-            "UPDATE media SET series_uuid = ?, series_no = ? WHERE id = ?;",
-            params![uuid, no, id],
+            "INSERT INTO media_series_ref (media_id, series_uuid, series_no) VALUES (?, ?, ?)",
+            params![id, uuid, no],
         )?;
         self.db.execute(
             "UPDATE series SET media_count = media_count + 1 WHERE uuid = ?;",
@@ -361,42 +381,24 @@ impl Library {
         Ok(())
     }
 
-    pub fn remove_from_series(&mut self, id: u64) -> Result<()> {
-        let uuid: Uuid = self.db.query_row(
-            "SELECT series_uuid FROM media WHERE id = ?;",
-            params![id],
-            |row| Ok(row.get(0)?),
-        )?;
+    pub fn remove_from_series(&mut self, id: u64, series_uuid: &Uuid) -> Result<()> {
         self.db.execute(
-            "UPDATE media SET series_uuid = NULL, series_no = NULL WHERE id = ?;",
-            params![id],
+            "DELETE FROM media_series_ref WHERE media_id = ? AND series_uuid = ?;",
+            params![id, series_uuid],
         )?;
         self.db.execute(
             "UPDATE series SET media_count = media_count - 1 WHERE uuid = ?;",
-            params![uuid],
+            params![series_uuid],
         )?;
         Ok(())
     }
 
-    pub fn update_series_no(&mut self, id: u64, no: u64, insert: bool) -> Result<()> {
-        let uuid: Uuid = match {
-            let uuid: Option<Uuid> = self.db.query_row(
-                "SELECT series_uuid FROM media WHERE id = ?;",
-                params![id],
-                |row| Ok(
-                    row.get(0)?
-                ),
-            )?;
-            uuid
-        } {
-            None => return Err(Error::NotIn { a: format!("Media #{}", id), b: format!("series") }),
-            Some(u) => u
-        };
+    pub fn update_series_no(&mut self, id: u64, series_uuid: &Uuid, no: u64, insert: bool) -> Result<()> {
         let mut stmt = self.db.prepare(
-            "SELECT series_no FROM media WHERE series_uuid = ?1 AND id != ?2;"
+            "SELECT series_no FROM media_series_ref WHERE series_uuid = ?1 AND media_id != ?2;"
         )?;
         let iter = stmt.query_map(
-            params![uuid, id],
+            params![series_uuid, id],
             |row| {
                 row.get(0)
             })?;
@@ -404,29 +406,24 @@ impl Library {
         if to_check.iter().any(|i| { *i == no }) {
             // insert or error
             if !insert {
-                return Err(Error::Occupied(format!("occupied when add media(id {}) to series {} with no {}", id, uuid, no)));
+                return Err(Error::Occupied(format!("occupied when add media(id {}) to series {} with no {}", id, series_uuid, no)));
             }
             self.db.execute(
-                "UPDATE media SET series_no = series_no + 1 WHERE series_uuid = ? AND series_no >= ?;",
-                params![uuid, no],
-            )?;
-            self.db.execute(
-                "UPDATE media SET series_no = ? WHERE id = ?;",
-                params![no, id],
-            )?;
-        } else {
-            self.db.execute(
-                "UPDATE media SET series_no = ? WHERE id = ?;",
-                params![no, id],
+                "UPDATE media_series_ref SET series_no = series_no + 1 WHERE series_uuid = ? AND series_no >= ?;",
+                params![series_uuid, no],
             )?;
         }
+        self.db.execute(
+            "UPDATE media_series_ref SET series_no = ? WHERE media_id = ?;",
+            params![no, id],
+        )?;
         Ok(())
     }
 
     pub fn trim_series_no(&mut self, uuid: &Uuid) -> Result<()> {
         // I sincerely recommend you not to use this function as much as possible
         let mut ids: Vec<(u64, u64)> = self.db.prepare(
-            "SELECT id, series_no FROM media WHERE series_uuid = ?;")?.query_map(
+            "SELECT media_id, series_no FROM media_series_ref WHERE series_uuid = ?;")?.query_map(
             params![uuid],
             |row| Ok((row.get(0)?, row.get(1)?)),
         )?.map(|x| x.unwrap()).collect();
@@ -437,7 +434,7 @@ impl Library {
         }
         for (id, no) in ids {
             self.db.execute(
-                "UPDATE media SET series_no = ? WHERE id = ?;",
+                "UPDATE media_series_ref SET series_no = ? WHERE media_id = ?;",
                 params![no, id],
             )?;
         }
@@ -451,8 +448,7 @@ impl Library {
             self.db.query_row(
                 "SELECT
                         hash, filename, filesize, caption, time_add,
-                        type, sub_type, type_addition, series_uuid,
-                        series_no, comment
+                        type, sub_type, type_addition, comment
                       FROM media WHERE id = ?;",
                 params![id],
                 |row|
@@ -470,6 +466,12 @@ impl Library {
                                                   extension().unwrap().to_str().unwrap())
                                 );
                         let filepath = filepath.to_str().unwrap().to_string();
+                        let series_uuids: Vec<Uuid> = self.db.prepare(
+                            "SELECT series_uuid FROM media_series_ref WHERE media_id = ?;")?
+                            .query_map(params![id],
+                                       |row| Ok(row.get(0)?))?
+                            .map(|x| x.unwrap())
+                            .collect();
                         Ok(Media {
                             id,
                             library_uuid: self.uuid.clone(),
@@ -482,9 +484,8 @@ impl Library {
                             kind: row.get(5)?,
                             sub_kind: row.get(6)?,
                             kind_addition: row.get(7)?,
-                            series_uuid: row.get(8)?,
-                            series_no: row.get(9)?,
-                            comment: row.get(10)?,
+                            comment: row.get(8)?,
+                            series_uuid: series_uuids,
                             detail: None,
                         })
                     },

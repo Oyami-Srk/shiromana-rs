@@ -27,7 +27,7 @@ mod tests {
         lib.update_media(&mut t1);
     }
 
-    #[test]
+    // #[test]
     fn test_get_by_name() {
         let mut lib = Library::open("test.mlib".to_string()).expect("?");
         dbg!(lib.get_media_by_filename("test_1.2.309090".to_string()));
@@ -35,7 +35,7 @@ mod tests {
         println!("{}", lib.get_media(99999).unwrap().to_string());
     }
 
-    // #[test]
+    #[test]
     fn __it_works() {
         fs::remove_dir_all("test.mlib");
         let lib = match Library::create(".".to_string(), "test".to_string(), None, Some("Mass".to_string())) {
@@ -47,13 +47,13 @@ mod tests {
                 let id2 = v.add_media("test/2.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
                 let id4 = v.add_media("test/4.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
                 let id5 = v.add_media("test/5.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
-                let series_uuid = v.create_series(Some("test".to_string()), Some("for_test".to_string())).unwrap();
+                let series_uuid = v.create_series("test".to_string(), Some("for_test".to_string())).unwrap();
                 println!("Create new series with uuid: {}", series_uuid);
-                v.add_to_series(id1, &series_uuid, Some(9));
-                v.add_to_series(id2, &series_uuid, Some(2));
-                v.add_to_series(id3, &series_uuid, Some(4));
-                v.add_to_series(id4, &series_uuid, Some(6));
-                v.remove_from_series(id2);
+                v.add_to_series(id1, &series_uuid, Some(9), false);
+                v.add_to_series(id2, &series_uuid, Some(2), false);
+                v.add_to_series(id3, &series_uuid, Some(4), false);
+                v.add_to_series(id4, &series_uuid, Some(6), false);
+                v.remove_from_series(id2, &series_uuid);
                 v.trim_series_no(&series_uuid);
 
                 println!("{}", v);

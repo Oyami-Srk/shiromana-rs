@@ -40,14 +40,14 @@ impl Display for Media {
         if let Some(v) = &self.kind_addition {
             s.push_str(&format!("Type Addition: {}\n", v));
         }
-        if let Some(v) = &self.series_uuid {
-            s.push_str(&format!("Series UUID: {}\n", v));
-        }
-        if let Some(v) = &self.series_no {
-            s.push_str(&format!("Series No: #{}\n", v));
-        }
         if let Some(v) = &self.comment {
             s.push_str(&format!("Comment: {}\n", v));
+        }
+        if !self.series_uuid.is_empty() {
+            s.push_str("Series UUIDs:\n");
+            for i in &self.series_uuid {
+                s.push_str(&indent(&format!("{}", i), "    "))
+            }
         }
         if let Some(v) = &self.detail {
             s.push_str(&format!("Details: \n{}", indent(&format!("{}", v), "    ")));

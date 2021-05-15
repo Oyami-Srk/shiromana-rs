@@ -45,8 +45,7 @@ pub struct Media {
     pub kind: MediaType,
     pub sub_kind: Option<String>,
     pub kind_addition: Option<String>,
-    pub series_uuid: Option<super::misc::Uuid>,
-    pub series_no: Option<u64>,
+    pub series_uuid: Vec<super::misc::Uuid>,
     pub comment: Option<String>,
     pub detail: Option<MediaDetail>,
 }
@@ -106,9 +105,6 @@ pub struct AddingMediaParam {
     sub_kind: Option<String>,
     kind_addition: Option<String>,
     comment: Option<String>,
-    // title here must be unique
-    series_title: Option<String>,
-    series_no: Option<u64>,
 }
 
 impl Default for AddingMediaParam {
@@ -119,8 +115,6 @@ impl Default for AddingMediaParam {
             sub_kind: None,
             kind_addition: None,
             comment: None,
-            series_title: None,
-            series_no: None,
         }
     }
 }
