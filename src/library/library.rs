@@ -541,6 +541,15 @@ impl Library {
         Ok(result)
     }
 
+    pub fn get_next_no_in_series(&self, uuid: &Uuid) -> Result<Option<u64>> {
+        let max_no: Option<u64> =
+            self.db.prepare(
+                "SELECT MAX(series_no) as max_no FROM media_series_ref WHERE series_uuid = ?;"
+            )?
+                .query_row(params![uuid], |row| Ok(row.get(0)?))?;
+        Ok(max_no.map(|v| v + 1))
+    }
+
     pub fn query_media(&self, sql_stmt: &str) -> Result<Vec<u64>> {
         Ok(
             self.db.prepare(&format!("SELECT id FROM media WHERE {};", sql_stmt))?

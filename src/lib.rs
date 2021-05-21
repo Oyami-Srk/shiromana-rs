@@ -55,6 +55,7 @@ mod tests {
                 v.add_to_series(id4, &series_uuid, Some(6), false);
                 v.remove_from_series(id2, &series_uuid);
                 v.trim_series_no(&series_uuid);
+                assert_eq!(v.get_next_no_in_series(&series_uuid).unwrap(), Some(4));
 
                 println!("{}", v);
                 let media1 = v.get_media(id1).unwrap();

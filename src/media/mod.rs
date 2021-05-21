@@ -9,7 +9,7 @@ pub enum MediaUpdateKey {
     Comment,
 }
 
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, serde::Serialize, serde::Deserialize, Debug)]
 pub enum MediaType {
     Image = 1,
     Text = 2,
