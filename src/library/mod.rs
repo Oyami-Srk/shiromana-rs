@@ -5,6 +5,7 @@ mod library;
 pub struct LibrarySummary {
     pub media_count: usize,
     pub series_count: usize,
+    pub tags_count: usize,
     pub media_size: usize,
 }
 
@@ -26,7 +27,7 @@ pub struct Library {
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 #[allow(non_snake_case)]
-struct LibraryMetadata {
+pub struct LibraryMetadata {
     UUID: String,
     library_name: String,
     master_name: Option<String>,
@@ -36,3 +37,8 @@ struct LibraryMetadata {
     summary: LibrarySummary,
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+pub enum MediaSetType {
+    Tag,
+    Series,
+}

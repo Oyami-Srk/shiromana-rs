@@ -1,10 +1,12 @@
 use std::{env, fmt, fs, path, str};
+use std::ffi::OsStr;
 use std::path::Path;
 
 use rusqlite::Connection;
 use rusqlite::params;
 use textwrap::indent;
 
+use crate::library::MediaSetType;
 use crate::media::*;
 
 use super::{Library, LibraryMetadata, LibrarySummary};
@@ -101,6 +103,7 @@ impl Library {
             summary: LibrarySummary {
                 media_count: 0,
                 series_count: 0,
+                tags_count: 0,
                 media_size: 0,
             },
             hash_algo: config::DEFAULT_HASH_ALGO.to_string(),
@@ -136,10 +139,19 @@ impl Library {
                     id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
                     media_id INTEGER NOT NULL,
                     tags_uuid CHAR(36) NOT NULL,
-                    FOREIGN KEY(media_id) REFERENCES media(id)
+                    FOREIGN KEY(media_id) REFERENCES media(id),
+                    FOREIGN KEY(tags_uuid) REFERENCES tags(uuid),
+                    CONSTRAINT unique_uuid_id UNIQUE (media_id, tags_uuid)
                 );
 
                 CREATE TABLE series(
+                   uuid CHAR(36) PRIMARY KEY NOT NULL UNIQUE,
+                   caption TEXT UNIQUE NOT NULL,
+                   media_count INTEGER,
+                   comment TEXT
+                );
+
+                CREATE TABLE tags(
                    uuid CHAR(36) PRIMARY KEY NOT NULL UNIQUE,
                    caption TEXT UNIQUE NOT NULL,
                    media_count INTEGER,
@@ -152,15 +164,32 @@ impl Library {
                     comment TEXT
                 );
 
-                CREATE TABLE media_series_ref(
+                CREATE TABLE media_location_ref(
+                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
+                    media_id INTEGER NOT NULL,
+                    path TEXT NOT NULL,
+                    filename TEXT NOT NULL,
+                    FOREIGN KEY(media_id) REFERENCES media(id),
+                    CONSTRAINT unique_uuid_id UNIQUE (media_id, path)
+                );
+                ")?;
+        db.execute(
+            &format!("CREATE TABLE media_series_ref(
                     id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
                     media_id INTEGER NOT NULL,
                     series_uuid CHAR(36) NOT NULL,
                     series_no INTEGER,
                     FOREIGN KEY(media_id) REFERENCES media(id),
                     FOREIGN KEY(series_uuid) REFERENCES series(uuid)
-                );
-                ")?;
+                    {}
+                );",
+                     if cfg!(feature = "no-duplication-in-series") {
+                         ",CONSTRAINT unique_uuid_id UNIQUE (series_uuid, media_id)"
+                     } else {
+                         ""
+                     }),
+            params![],
+        )?;
         db.execute(
             "INSERT INTO library (uuid, path) VALUES
                     (?, ?);",
@@ -183,6 +212,7 @@ impl Library {
             summary: LibrarySummary {
                 media_count: 0,
                 series_count: 0,
+                tags_count: 0,
                 media_size: 0,
             },
             hash_algo: HashAlgo::from_string(config::DEFAULT_HASH_ALGO.to_string())?,
@@ -199,7 +229,7 @@ impl Library {
         }
         let file_hash = self.hash_algo.do_hash(media_path.to_str().unwrap().to_string())?;
         let file_name = media_path.file_name().unwrap().to_str().unwrap();
-        let file_ext = media_path.extension().unwrap().to_str().unwrap();
+        let file_ext = media_path.extension().unwrap_or(OsStr::new("")).to_str().unwrap();
         let new_path = self.get_media_path_by_hash(&file_hash, file_ext);
         if new_path.exists() {
             // We believe that no collision on images
@@ -216,6 +246,11 @@ impl Library {
         let id = self.db.last_insert_rowid() as u64;
         self.summary.media_count += 1;
         self.summary.media_size += file_size as usize;
+        // insert into location ref
+        let _ = self.db.execute(
+            "INSERT INTO media_location_ref (media_id, path, filename) VALUES (?,?,?);",
+            params![id, media_path.canonicalize()?.to_str(), media_path.file_stem().unwrap().to_str()],
+        ); // ignore fails
         Ok(id)
     }
 
@@ -241,6 +276,7 @@ impl Library {
         fs::remove_file(media_file)?;
         self.summary.media_size -= file_size;
         self.summary.media_count -= 1;
+        // TODO: REMOVE series and tag notation
         Ok(())
     }
 
@@ -251,7 +287,6 @@ impl Library {
             |row| Ok(row.get(0)?),
         )?;
         if is_hash_changed {
-
             // changing hash means to merge two media. if there is no media targeting changed hash
             // we fall. Btw, we tend to keep original media infos instead new one but set filename
             // to the new.
@@ -309,86 +344,139 @@ impl Library {
         Ok(())
     }
 
-    pub fn create_series(&mut self, caption: String, comment: Option<String>) -> Result<Uuid> {
+    pub fn create_set(&mut self, kind: MediaSetType, caption: String, comment: Option<String>) -> Result<Uuid> {
         let uuid = Uuid::new_v4();
         self.db.execute(
-            "INSERT INTO series (uuid, caption, comment, media_count) VALUES (?, ?, ?, 0);",
-            params![uuid, caption, comment],
+            &format!("INSERT INTO {} (uuid, caption, comment, media_count) VALUES (?, ?, ?, 0);",
+                     match kind {
+                         MediaSetType::Series => "series",
+                         MediaSetType::Tag => "tags"
+                     }),
+            params![
+                uuid, caption, comment],
         )?;
-        self.summary.series_count += 1;
+        match kind {
+            MediaSetType::Series => self.summary.series_count += 1,
+            MediaSetType::Tag => self.summary.tags_count += 1,
+        }
         Ok(uuid)
     }
 
-    pub fn delete_series(&mut self, uuid: &Uuid) -> Result<()> {
+    pub fn delete_set(&mut self, kind: MediaSetType, uuid: &Uuid) -> Result<()> {
         self.db.execute(
-            "DELETE FROM series WHERE uuid = ?;",
+            "DELETE FROM {} WHERE uuid = ?;",
+            params![
+        match kind {
+        MediaSetType::Series => "series",
+        MediaSetType::Tag => "tags"
+        }, uuid],
+        )?;
+        self.db.execute(
+            match kind {
+                MediaSetType::Series => "DELETE FROM media_series_ref WHERE series_uuid = ?;",
+                MediaSetType::Tag => "DELETE FROM media_tags_ref WHERE tags_uuid = ?;",
+            },
             params![uuid],
         )?;
         self.db.execute(
-            "DELETE FROM media_series_ref WHERE series_uuid = ?;",
+            match kind {
+                MediaSetType::Series => "DELETE FROM series WHERE uuid = ?;",
+                MediaSetType::Tag => "DELETE FROM tags WHERE uuid = ?;",
+            },
             params![uuid],
         )?;
-        self.summary.series_count -= 1;
+        match kind {
+            MediaSetType::Series => self.summary.series_count -= 1,
+            MediaSetType::Tag => self.summary.tags_count -= 1,
+        }
         Ok(())
     }
 
-    pub fn get_series_by_name(&self, caption: String) -> Result<Uuid> {
-        let uuid: Uuid = self.db.query_row(
+    // Return (Series_UUID, Tag_UUID)
+    pub fn get_set_by_name(&self, caption: String) -> Result<(Option<Uuid>, Option<Uuid>)> {
+        let series_uuid: Option<Uuid> = self.db.query_row(
             "SELECT uuid FROM series WHERE caption = ?;",
             params![caption],
             |row| Ok(row.get(0)?),
-        )?;
-        Ok(uuid)
+        ).unwrap_or(None);
+        let tag_uuid: Option<Uuid> = self.db.query_row(
+            "SELECT uuid FROM tags WHERE caption = ?;",
+            params![caption],
+            |row| Ok(row.get(0)?),
+        ).unwrap_or(None);
+        Ok((series_uuid, tag_uuid))
     }
 
-    pub fn add_to_series(&mut self, id: u64, uuid: &Uuid, no: Option<u64>, unsorted: bool) -> Result<()> {
-        let mut stmt = self.db.prepare(
-            "SELECT series_no FROM media_series_ref WHERE series_uuid = ?1 AND media_id != ?2;"
-        )?;
-        let iter = stmt.query_map(
-            params![uuid, id],
-            |row| {
-                row.get(0)
-            })?;
-        let to_check: Vec<u64> = iter.map(|x| x.unwrap()).collect();
-        let no = if let Some(no) = no {
-            // if the no is specified.
-            if to_check.iter().any(|i| { *i == no }) {
-                return Err(Error::Occupied(format!("occupied when add media(id {}) to series {} with no {}", id, uuid, no)));
+    pub fn add_to_set(&mut self, kind: MediaSetType, id: u64, uuid: &Uuid, no: Option<u64>, unsorted: bool) -> Result<()> {
+        match kind {
+            MediaSetType::Series => {
+                let mut stmt = self.db.prepare(
+                    "SELECT series_no FROM media_series_ref WHERE series_uuid = ?1 AND media_id != ?2;"
+                )?;
+                let iter = stmt.query_map(
+                    params![uuid, id],
+                    |row| {
+                        row.get(0)
+                    })?;
+                let to_check: Vec<u64> = iter.map(|x| x.unwrap()).collect();
+                let no = if let Some(no) = no {
+                    // if the no is specified.
+                    if to_check.iter().any(|i| { *i == no }) {
+                        return Err(Error::Occupied(format!("occupied when add media(id {}) to series {} with no {}", id, uuid, no)));
+                    }
+                    Some(no)
+                } else {
+                    // or this is a unsorted media
+                    if unsorted {
+                        None
+                    } else {
+                        // or not, we use the biggest no in the to_check list +1 to be the no
+                        let biggest = to_check.iter().max();
+                        Some(match biggest {
+                            Some(m) => m + 1,
+                            None => 1
+                        })
+                    }
+                };
+                self.db.execute(
+                    "INSERT INTO media_series_ref (media_id, series_uuid, series_no) VALUES (?, ?, ?)",
+                    params![id, uuid, no],
+                )?;
+                self.db.execute(
+                    "UPDATE series SET media_count = media_count + 1 WHERE uuid = ?;",
+                    params![uuid],
+                )?;
             }
-            Some(no)
-        } else {
-            // or this is a unsorted media
-            if unsorted {
-                None
-            } else {
-                // or not, we use the biggest no in the to_check list +1 to be the no
-                let biggest = to_check.iter().max();
-                Some(match biggest {
-                    Some(m) => m + 1,
-                    None => 1
-                })
+            MediaSetType::Tag => {
+                self.db.execute(
+                    "INSERT INTO media_tags_ref (media_id, tag_uuid, series_no) VALUES (?, ?, ?)",
+                    params![id, uuid, no],
+                )?;
+                self.db.execute(
+                    "UPDATE tags SET media_count = media_count + 1 WHERE uuid = ?;",
+                    params![uuid],
+                )?;
             }
-        };
-        self.db.execute(
-            "INSERT INTO media_series_ref (media_id, series_uuid, series_no) VALUES (?, ?, ?)",
-            params![id, uuid, no],
-        )?;
-        self.db.execute(
-            "UPDATE series SET media_count = media_count + 1 WHERE uuid = ?;",
-            params![uuid],
-        )?;
+        }
         Ok(())
     }
 
-    pub fn remove_from_series(&mut self, id: u64, series_uuid: &Uuid) -> Result<()> {
+    pub fn remove_from_set(&mut self, kind: MediaSetType, id: u64, uuid: &Uuid) -> Result<()> {
         self.db.execute(
-            "DELETE FROM media_series_ref WHERE media_id = ? AND series_uuid = ?;",
-            params![id, series_uuid],
+            &format!("DELETE FROM media_{}_ref WHERE media_id = ? AND series_uuid = ?;",
+                     match kind {
+                         MediaSetType::Series => "series",
+                         MediaSetType::Tag => "tags",
+                     }),
+            params![id, uuid],
         )?;
         self.db.execute(
-            "UPDATE series SET media_count = media_count - 1 WHERE uuid = ?;",
-            params![series_uuid],
+            &format!("UPDATE {} SET media_count = media_count - 1 WHERE uuid = ?;",
+                     match kind {
+                         MediaSetType::Series => "series",
+                         MediaSetType::Tag => "tags",
+                     }),
+            params![uuid],
         )?;
         Ok(())
     }
@@ -441,7 +529,6 @@ impl Library {
         Ok(())
     }
 
-
     pub fn get_media(&self, id: u64) -> Result<Media> {
         // TODO: figure out the time spend on selecting one column and more.
         let mut media =
@@ -454,20 +541,19 @@ impl Library {
                 |row|
                     {
                         let hash: String = row.get(0)?;
-                        let filename = row.get(1)?;
-                        let filepath =
-                            path::PathBuf::new()
-                                .join(&self.path)
-                                .join(&self.media_folder)
-                                .join(&hash[..2])
-                                .join(format!("{}.{}",
-                                              &hash[2..],
-                                              path::PathBuf::from(&filename).
-                                                  extension().unwrap().to_str().unwrap())
-                                );
+                        let file_name = row.get(1)?;
+                        let file_ext = path::PathBuf::from(&file_name);
+                        let file_ext = file_ext.extension().unwrap_or(OsStr::new("")).to_str().unwrap();
+                        let filepath = self.get_media_path_by_hash(&hash, file_ext);
                         let filepath = filepath.to_str().unwrap().to_string();
                         let series_uuids: Vec<Uuid> = self.db.prepare(
                             "SELECT series_uuid FROM media_series_ref WHERE media_id = ?;")?
+                            .query_map(params![id],
+                                       |row| Ok(row.get(0)?))?
+                            .map(|x| x.unwrap())
+                            .collect();
+                        let tags_uuids: Vec<Uuid> = self.db.prepare(
+                            "SELECT tags_uuid FROM media_tags_ref WHERE media_id = ?;")?
                             .query_map(params![id],
                                        |row| Ok(row.get(0)?))?
                             .map(|x| x.unwrap())
@@ -476,7 +562,7 @@ impl Library {
                             id,
                             library_uuid: self.uuid.clone(),
                             hash,
-                            filename,
+                            filename: file_name,
                             filepath,
                             filesize: row.get(2)?,
                             caption: row.get(3)?,
@@ -485,7 +571,8 @@ impl Library {
                             sub_kind: row.get(6)?,
                             kind_addition: row.get(7)?,
                             comment: row.get(8)?,
-                            series_uuid: series_uuids,
+                            series: series_uuids,
+                            tag: tags_uuids,
                             detail: None,
                         })
                     },
@@ -496,7 +583,7 @@ impl Library {
             params![id],
             |row| Ok(row.get(0)?),
         )?;
-        if is_detailed && media.kind.is_some() {
+        if is_detailed & &media.kind.is_some() {
             let detail: String = self.db.query_row(
                 "SELECT details FROM media_detail WHERE id = ?;",
                 params![id],
@@ -512,32 +599,23 @@ impl Library {
     }
 
     pub fn get_media_by_filename(&self, filename: String) -> Result<Vec<u64>> {
+        let filename_stem = Path::new(&filename).file_stem().unwrap().to_str().unwrap();
+
         let mut result: Vec<u64> = vec![];
         let id_fn: Vec<(u64, String)> = self.db.prepare(
-            "SELECT id, filename FROM media WHERE filename LIKE ? ESCAPE '\\';"
+            "SELECT id, filename FROM media_location_ref WHERE filename LIKE ? ESCAPE '\\';"
         )?.query_map(
-            params![filename.replace("%", "\\%") + "%"],
+            params![filename_stem.replace("%", "\\%") + "%"],
             |row| Ok((row.get(0)?, row.get(1)?)),
         )?.map(|x| x.unwrap()).collect();
+
         for v in id_fn.iter() {
-            if v.1 == filename {
+            if v.1 == filename_stem || v.1 == filename {
                 result.push(v.0);
             }
         };
-        let id_fn: Vec<(u64, String)> = id_fn.iter().map(
-            |x| (x.0,
-                 Path::new(&x.1)
-                     .file_stem()
-                     .unwrap_or_default()
-                     .to_str()
-                     .unwrap_or("")
-                     .to_string()))
-            .collect();
-        for v in id_fn.iter() {
-            if v.1 == filename {
-                result.push(v.0);
-            }
-        };
+        result.sort();
+        result.dedup();
         Ok(result)
     }
 
@@ -630,6 +708,13 @@ impl Library {
             .join(self.path.as_str())
             .join(&self.media_folder)
             .join(&hash[..2])
-            .join(format!("{}.{}", &hash[2..], ext))
+            .join(format!("{}{}",
+                          &hash[2..],
+                          if ext != "" {
+                              format!(".{}", ext)
+                          } else {
+                              "".to_string()
+                          }
+            ))
     }
 }

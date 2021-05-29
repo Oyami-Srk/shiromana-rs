@@ -45,7 +45,8 @@ pub struct Media {
     pub kind: MediaType,
     pub sub_kind: Option<String>,
     pub kind_addition: Option<String>,
-    pub series_uuid: Vec<super::misc::Uuid>,
+    pub series: Vec<super::misc::Uuid>,
+    pub tag: Vec<super::misc::Uuid>,
     pub comment: Option<String>,
     pub detail: Option<MediaDetail>,
 }

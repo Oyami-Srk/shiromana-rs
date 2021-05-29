@@ -43,9 +43,15 @@ impl Display for Media {
         if let Some(v) = &self.comment {
             s.push_str(&format!("Comment: {}\n", v));
         }
-        if !self.series_uuid.is_empty() {
+        if !self.series.is_empty() {
             s.push_str("Series UUIDs:\n");
-            for i in &self.series_uuid {
+            for i in &self.series {
+                s.push_str(&indent(&format!("{}", i), "    "))
+            }
+        }
+        if !self.tag.is_empty() {
+            s.push_str("Tags UUIDs:\n");
+            for i in &self.tag {
                 s.push_str(&indent(&format!("{}", i), "    "))
             }
         }

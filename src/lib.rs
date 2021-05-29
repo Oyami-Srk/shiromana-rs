@@ -30,9 +30,7 @@ mod tests {
     // #[test]
     fn test_get_by_name() {
         let mut lib = Library::open("test.mlib".to_string()).expect("?");
-        dbg!(lib.get_media_by_filename("test_1.2.309090".to_string()));
-        dbg!(lib.query_media("hash = 'AAA'"));
-        println!("{}", lib.get_media(99999).unwrap().to_string());
+        dbg!(lib.get_media_by_filename("1.jpg".to_string()));
     }
 
     #[test]
@@ -47,13 +45,13 @@ mod tests {
                 let id2 = v.add_media("test/2.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
                 let id4 = v.add_media("test/4.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
                 let id5 = v.add_media("test/5.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
-                let series_uuid = v.create_series("test".to_string(), Some("for_test".to_string())).unwrap();
+                let series_uuid = v.create_set(MediaSetType::Series, "test".to_string(), Some("for_test".to_string())).unwrap();
                 println!("Create new series with uuid: {}", series_uuid);
-                v.add_to_series(id1, &series_uuid, Some(9), false);
-                v.add_to_series(id2, &series_uuid, Some(2), false);
-                v.add_to_series(id3, &series_uuid, Some(4), false);
-                v.add_to_series(id4, &series_uuid, Some(6), false);
-                v.remove_from_series(id2, &series_uuid);
+                v.add_to_set(MediaSetType::Series, id1, &series_uuid, Some(9), false);
+                v.add_to_set(MediaSetType::Series, id2, &series_uuid, Some(2), false);
+                v.add_to_set(MediaSetType::Series, id3, &series_uuid, Some(4), false);
+                v.add_to_set(MediaSetType::Series, id4, &series_uuid, Some(6), false);
+                v.remove_from_set(MediaSetType::Series, id2, &series_uuid);
                 v.trim_series_no(&series_uuid);
                 assert_eq!(v.get_next_no_in_series(&series_uuid).unwrap(), Some(4));
 
@@ -80,6 +78,7 @@ mod tests {
                     let end = chrono::Local::now();
                     println!("Time usage: {}", end - begin);
                 }
+                println!("{}", v.to_string());
             }
             Err(e) => {
                 println!("{}", e);
