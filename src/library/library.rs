@@ -1,5 +1,4 @@
 use std::{env, fmt, fs, path, str};
-use std::ffi::OsStr;
 use std::path::Path;
 
 use rusqlite::Connection;
@@ -54,12 +53,14 @@ impl Library {
         }
         let db = Connection::open(config::DATABASE_FN)?;
         let shared_db = Connection::open(config::SHARED_DATABASE_FN)?;
+        let thumbnail_db = Connection::open(config::THUMBNAIL_DATABASE_FN)?;
         let path = std::env::current_dir()?.to_str().unwrap().to_string();
         std::env::set_current_dir(current_workdir)?;
 
         Ok(Library {
             db,
             shared_db,
+            thumbnail_db,
             path,
             uuid: library_uuid.as_str().parse().unwrap(),
             library_name: metadata.library_name,
@@ -196,6 +197,21 @@ impl Library {
             params![&library_uuid, env::current_dir()?.to_str()],
         )?;
         let shared_db = Connection::open(config::SHARED_DATABASE_FN)?;
+        let thumbnail_db = Connection::open(config::THUMBNAIL_DATABASE_FN)?;
+        thumbnail_db.execute_batch("
+            CREATE TABLE metadata(
+                    library_uuid CHAR(36) PRIMARY KEY NOT NULL UNIQUE
+                );
+                CREATE TABLE thumbnail(
+                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
+                    data BLOB
+                );;
+                "
+        )?;
+        thumbnail_db.execute(
+            "INSERT INTO metadata (library_uuid) VALUES (?);",
+            params![&library_uuid],
+        )?;
         fs::create_dir(&media_folder)?;
         env::set_current_dir(current_dir)?;
         let library_path = library_path.canonicalize()?;
@@ -203,6 +219,7 @@ impl Library {
         Ok(Library {
             db,
             shared_db,
+            thumbnail_db,
             path: library_path.to_str().unwrap().to_string(),
             uuid: library_uuid,
             library_name,
@@ -223,17 +240,31 @@ impl Library {
     pub fn add_media(&mut self, path: String, kind: MediaType, sub_kind: Option<String>,
                      kind_addition: Option<String>, caption: Option<String>,
                      comment: Option<String>) -> Result<u64> {
+        if let MediaType::URL = kind {
+            return self.add_url(path, sub_kind, kind_addition, caption, comment);
+        }
         let media_path = path::PathBuf::from(path);
         if !media_path.is_file() {
             return Err(err_type_mismatch_expect_dir_found_file!(media_path.to_str().unwrap().to_string()));
         }
         let file_hash = self.hash_algo.do_hash(media_path.to_str().unwrap().to_string())?;
         let file_name = media_path.file_name().unwrap().to_str().unwrap();
-        let file_ext = media_path.extension().unwrap_or(OsStr::new("")).to_str().unwrap();
-        let new_path = self.get_media_path_by_hash(&file_hash, file_ext);
+        let new_path = self.get_media_path_by_hash(&file_hash);
         if new_path.exists() {
             // We believe that no collision on images
-            return Err(Error::AlreadyExists(file_hash));
+            let id = self.query_media(&format!("hash = '{}'", file_hash))
+                .map_err(|e| Error::AlreadyExists(file_hash.clone() + "," + e.to_string().as_str()))?
+                .first()
+                .map(|v| *v);
+            return if let Some(id) = id {
+                let _ = self.db.execute(
+                    "INSERT INTO media_location_ref (media_id, path, filename) VALUES (?,?,?);",
+                    params![id, media_path.canonicalize()?.to_str(), media_path.file_stem().unwrap().to_str()],
+                ); // ignore fails
+                Err(Error::AlreadyExists(id.to_string()))
+            } else {
+                Err(Error::AlreadyExists(file_hash))
+            };
         }
         fs::create_dir_all(new_path.parent().unwrap())?;
         fs::copy(&media_path, &new_path)?;
@@ -254,17 +285,29 @@ impl Library {
         Ok(id)
     }
 
+    pub fn add_url(&mut self, url: String, sub_kind: Option<String>,
+                   kind_addition: Option<String>, caption: Option<String>,
+                   comment: Option<String>) -> Result<u64> {
+        let hash = self.hash_algo.do_hash_str(&url)?;
+        self.db.execute(
+            "INSERT INTO media (hash, filename, filesize, caption, type, sub_type, type_addition, comment)
+            VALUES (?,?,?,?,?,?,?,?);",
+            params![hash, url, 0, caption, MediaType::URL, sub_kind, kind_addition, comment],
+        )?;
+        let id = self.db.last_insert_rowid() as u64;
+        self.summary.media_count += 1;
+        Ok(id)
+    }
+
     pub fn remove_media(&mut self, id: u64) -> Result<()> {
-        let (file_hash, file_name, file_size): (String, String, usize) = self.db.query_row(
-            "SELECT hash, filename, filesize FROM media WHERE id = ?;",
+        let (file_hash, file_size): (String, usize) = self.db.query_row(
+            "SELECT hash, filesize FROM media WHERE id = ?;",
             params![&id],
             |row| {
-                Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+                Ok((row.get(0)?, row.get(2)?))
             },
         )?;
-        let ext: Vec<&str> = file_name.split('.').collect();
-        let ext = ext[ext.len() - 1];
-        let media_file = self.get_media_path_by_hash(&file_hash, ext);
+        let media_file = self.get_media_path_by_hash(&file_hash);
         println!("{}", media_file.to_str().unwrap().to_string());
         if !media_file.is_file() {
             panic!("Media file is not exists or not a regular file.");
@@ -542,9 +585,7 @@ impl Library {
                     {
                         let hash: String = row.get(0)?;
                         let file_name = row.get(1)?;
-                        let file_ext = path::PathBuf::from(&file_name);
-                        let file_ext = file_ext.extension().unwrap_or(OsStr::new("")).to_str().unwrap();
-                        let filepath = self.get_media_path_by_hash(&hash, file_ext);
+                        let filepath = self.get_media_path_by_hash(&hash);
                         let filepath = filepath.to_str().unwrap().to_string();
                         let series_uuids: Vec<Uuid> = self.db.prepare(
                             "SELECT series_uuid FROM media_series_ref WHERE media_id = ?;")?
@@ -596,6 +637,12 @@ impl Library {
         }
 
         Ok(media)
+    }
+
+    pub fn detailize(&self, id: u64) -> Result<()> {
+        let media = self.get_media(id)?;
+        media.detailize(None);
+        Ok(())
     }
 
     pub fn get_media_by_filename(&self, filename: String) -> Result<Vec<u64>> {
@@ -702,19 +749,14 @@ impl fmt::Display for Library {
 
 impl Library {
     // private method
-    fn get_media_path_by_hash(&self, hash: &str, ext: &str) -> path::PathBuf {
+    fn get_media_path_by_hash(&self, hash: &str) -> path::PathBuf {
         // this method do not promise the existence.
         path::PathBuf::new()
             .join(self.path.as_str())
             .join(&self.media_folder)
             .join(&hash[..2])
-            .join(format!("{}{}",
+            .join(format!("{}",
                           &hash[2..],
-                          if ext != "" {
-                              format!(".{}", ext)
-                          } else {
-                              "".to_string()
-                          }
             ))
     }
 }

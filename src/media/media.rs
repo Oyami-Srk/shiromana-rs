@@ -9,12 +9,14 @@ use super::{*};
 use super::super::misc::{Error, Result};
 
 impl Media {
-    pub fn detailed(self, other: HashMap<String, String>) -> Media {
+    pub fn detailize(self, other: Option<HashMap<String, String>>) -> Media {
+        let other = other.unwrap_or(HashMap::new());
         let detail = match &self.kind {
             MediaType::Image => ImageDetail::get_detail(&self.filepath),
             MediaType::Text => TextDetail::get_detail(&self.filepath),
             MediaType::Audio => AudioDetail::get_detail(&self.filepath),
             MediaType::Video => VideoDetail::get_detail(&self.filepath),
+            MediaType::URL => URLDetail::get_detail(&self.filepath),
             MediaType::Other => return {
                 Media {
                     detail: Some(MediaDetail {
@@ -59,6 +61,7 @@ impl MediaType {
             MediaType::Text => 2,
             MediaType::Audio => 3,
             MediaType::Video => 4,
+            MediaType::URL => 5,
             MediaType::Other => 10,
             MediaType::None => 99999,
         }
@@ -81,6 +84,7 @@ impl TryFrom<u32> for MediaType {
                 2 => MediaType::Text,
                 3 => MediaType::Audio,
                 4 => MediaType::Video,
+                5 => MediaType::URL,
                 10 => MediaType::Other,
                 99999 => MediaType::None,
                 _ => return Err(Error::TypeMismatch { val: v.to_string(), expect: "valid type id".to_string(), found: "invalid type id".to_string() })
@@ -121,11 +125,12 @@ impl MediaType {
     }
 }
 
-trait GetDetail {
+trait Detailize {
     fn get_detail(media_path: &str) -> Result<TypesDetail>;
+    fn get_thumbnail<W>(media_path: &str, image: &mut W, width: u32, height: u32) -> Result<()> where W: std::io::Write;
 }
 
-impl GetDetail for ImageDetail {
+impl Detailize for ImageDetail {
     fn get_detail(media_path: &str) -> Result<TypesDetail> {
         let img = ImageReader::open(media_path)?;
         let format = img.format();
@@ -149,26 +154,72 @@ impl GetDetail for ImageDetail {
             format,
         }))
     }
+
+    fn get_thumbnail<W>(media_path: &str, image: &mut W, width: u32, height: u32) -> Result<()> where W: std::io::Write {
+        let img = ImageReader::open(media_path)?.decode()?;
+        let thumb = img.thumbnail(width, height);
+        thumb.write_to(image, ImageFormat::Png)?;
+        Ok(())
+    }
 }
 
-impl GetDetail for TextDetail {
+impl Detailize for TextDetail {
     fn get_detail(media_path: &str) -> Result<TypesDetail> {
         let _ = media_path;
         unimplemented!()
     }
+
+    fn get_thumbnail<W>(media_path: &str, image: &mut W, width: u32, height: u32) -> Result<()> where W: std::io::Write {
+        let _ = media_path;
+        let _ = image;
+        let _ = width;
+        let _ = height;
+        unimplemented!();
+    }
 }
 
-impl GetDetail for AudioDetail {
+impl Detailize for AudioDetail {
     fn get_detail(media_path: &str) -> Result<TypesDetail> {
         let _ = media_path;
         unimplemented!()
     }
+
+    fn get_thumbnail<W>(media_path: &str, image: &mut W, width: u32, height: u32) -> Result<()> where W: std::io::Write {
+        let _ = media_path;
+        let _ = image;
+        let _ = width;
+        let _ = height;
+        unimplemented!();
+    }
 }
 
-impl GetDetail for VideoDetail {
+impl Detailize for VideoDetail {
     fn get_detail(media_path: &str) -> Result<TypesDetail> {
         let _ = media_path;
         unimplemented!()
+    }
+
+    fn get_thumbnail<W>(media_path: &str, image: &mut W, width: u32, height: u32) -> Result<()> where W: std::io::Write {
+        let _ = media_path;
+        let _ = image;
+        let _ = width;
+        let _ = height;
+        unimplemented!();
+    }
+}
+
+impl Detailize for URLDetail {
+    fn get_detail(media_path: &str) -> Result<TypesDetail> {
+        let _ = media_path;
+        unimplemented!()
+    }
+
+    fn get_thumbnail<W>(media_path: &str, image: &mut W, width: u32, height: u32) -> Result<()> where W: std::io::Write {
+        let _ = media_path;
+        let _ = image;
+        let _ = width;
+        let _ = height;
+        unimplemented!();
     }
 }
 
@@ -181,6 +232,7 @@ impl std::str::FromStr for MediaType {
             "text" => Self::Text,
             "audio" => Self::Audio,
             "video" => Self::Video,
+            "url" => Self::URL,
             "other" => Self::Other,
             "none" => Self::None,
             _ => Self::Other

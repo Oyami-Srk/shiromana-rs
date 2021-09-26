@@ -15,6 +15,7 @@ pub enum MediaType {
     Text = 2,
     Audio = 3,
     Video = 4,
+    URL = 5,
     Other = 10,
     None = 99999,
 }
@@ -63,6 +64,7 @@ pub enum TypesDetail {
     Video(VideoDetail),
     Audio(AudioDetail),
     Text(TextDetail),
+    URL(URLDetail),
     Other,
 }
 
@@ -97,6 +99,13 @@ pub struct AudioDetail {
     time_len: u64,
     codec: String,
     bit_rates: u64,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+pub struct URLDetail {
+    schema: String,
+    host: String,
+    path: String,
 }
 
 #[allow(dead_code)]

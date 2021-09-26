@@ -21,7 +21,7 @@ mod tests {
         println!("{}", lib);
         let t1 = lib.get_media(1).unwrap();
         println!("{}", t1);
-        let mut t1 = t1.detailed(HashMap::new());
+        let mut t1 = t1.detailize(None);
         println!("{}", t1);
         println!("{}", serde_json::to_string_pretty(&t1).unwrap());
         lib.update_media(&mut t1);
@@ -35,6 +35,8 @@ mod tests {
 
     #[test]
     fn __it_works() {
+        println!("test!");
+        println!("test2!");
         fs::remove_dir_all("test.mlib");
         let lib = match Library::create(".".to_string(), "test".to_string(), None, Some("Mass".to_string())) {
             Ok(mut v) => {
@@ -54,6 +56,8 @@ mod tests {
                 v.remove_from_set(MediaSetType::Series, id2, &series_uuid);
                 v.trim_series_no(&series_uuid);
                 assert_eq!(v.get_next_no_in_series(&series_uuid).unwrap(), Some(4));
+
+                v.add_url("https://doc.rust-lang.org/stable/std/index.html".into(), None, None, None, None);
 
                 println!("{}", v);
                 let media1 = v.get_media(id1).unwrap();

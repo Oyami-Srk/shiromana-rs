@@ -39,6 +39,32 @@ impl HashAlgo {
         }
     }
 
+    fn do_hash_for_reader<R: ?Sized>(algo: &HashAlgo, reader: &mut R) -> Result<String>
+        where R: std::io::Read {
+        Ok(match algo {
+            HashAlgo::MD5 => {
+                let mut hasher = Md5::new();
+                std::io::copy(reader, &mut hasher)?;
+                format!("{:X}", hasher.finalize())
+            }
+            HashAlgo::SHA1 => {
+                let mut hasher = Sha1::new();
+                std::io::copy(reader, &mut hasher)?;
+                format!("{:X}", hasher.finalize())
+            }
+            HashAlgo::SHA256 => {
+                let mut hasher = Sha256::new();
+                std::io::copy(reader, &mut hasher)?;
+                format!("{:X}", hasher.finalize())
+            }
+            HashAlgo::BLAKE3 => {
+                let mut hasher = blake3::Hasher::new();
+                std::io::copy(reader, &mut hasher)?;
+                format!("{}", hasher.finalize().to_hex().to_uppercase())
+            }
+        })
+    }
+
 
     pub fn do_hash(&self, file_path: String) -> Result<String> {
         let path = std::path::PathBuf::from(file_path);
@@ -49,28 +75,12 @@ impl HashAlgo {
             return Err(err_type_mismatch_expect_dir_found_file!(path.to_str().unwrap().to_string()));
         }
         let mut file = fs::File::open(path)?;
-        Ok(match self {
-            HashAlgo::MD5 => {
-                let mut hasher = Md5::new();
-                std::io::copy(&mut file, &mut hasher)?;
-                format!("{:X}", hasher.finalize())
-            }
-            HashAlgo::SHA1 => {
-                let mut hasher = Sha1::new();
-                std::io::copy(&mut file, &mut hasher)?;
-                format!("{:X}", hasher.finalize())
-            }
-            HashAlgo::SHA256 => {
-                let mut hasher = Sha256::new();
-                std::io::copy(&mut file, &mut hasher)?;
-                format!("{:X}", hasher.finalize())
-            }
-            HashAlgo::BLAKE3 => {
-                let mut hasher = blake3::Hasher::new();
-                std::io::copy(&mut file, &mut hasher)?;
-                format!("{:X}", hasher.finalize())
-            }
-        })
+        Self::do_hash_for_reader(self, &mut file)
+    }
+
+    pub fn do_hash_str(&self, s: &str) -> Result<String> {
+        let mut s: &[u8] = s.as_bytes();
+        Self::do_hash_for_reader(self, &mut s)
     }
 
     pub fn get_size(&self) -> usize {
@@ -78,7 +88,7 @@ impl HashAlgo {
             HashAlgo::MD5 => Md5::output_size(),
             HashAlgo::SHA1 => Sha1::output_size(),
             HashAlgo::SHA256 => Sha256::output_size(),
-            HashAlgo::BLAKE3 => blake3::Hasher::output_size(),
+            HashAlgo::BLAKE3 => blake3::OUT_LEN,
         }
     }
 }

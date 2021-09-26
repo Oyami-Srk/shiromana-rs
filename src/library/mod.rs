@@ -13,7 +13,8 @@ pub struct LibrarySummary {
 #[derive(Debug)]
 pub struct Library {
     pub(crate) db: rusqlite::Connection,
-    shared_db: rusqlite::Connection,
+    pub(crate) shared_db: rusqlite::Connection,
+    pub(crate) thumbnail_db: rusqlite::Connection,
     path: String,
     pub uuid: super::misc::Uuid,
     library_name: String,

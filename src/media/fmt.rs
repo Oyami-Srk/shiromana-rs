@@ -2,7 +2,7 @@ use std::fmt::{Display, Formatter, Result};
 
 use textwrap::indent;
 
-use crate::media::{AudioDetail, ImageDetail, MediaDetail, TextDetail, TypesDetail, VideoDetail};
+use crate::media::{AudioDetail, ImageDetail, MediaDetail, TextDetail, TypesDetail, URLDetail, VideoDetail};
 
 use super::Media;
 use super::MediaType;
@@ -14,6 +14,7 @@ impl Display for MediaType {
             MediaType::Text => write!(f, "Text"),
             MediaType::Audio => write!(f, "Audio"),
             MediaType::Video => write!(f, "Video"),
+            MediaType::URL => write!(f, "URL"),
             MediaType::Other => write!(f, "Other"),
             MediaType::None => write!(f, "None")
         }
@@ -78,6 +79,7 @@ impl Display for TypesDetail {
             TypesDetail::Video(v) => write!(f, "{}", v),
             TypesDetail::Audio(v) => write!(f, "{}", v),
             TypesDetail::Text(v) => write!(f, "{}", v),
+            TypesDetail::URL(v) => write!(f, "{}", v),
             TypesDetail::Other => write!(f, "Other has no specified detail field.")
         }
     }
@@ -104,6 +106,13 @@ impl Display for AudioDetail {
 }
 
 impl Display for VideoDetail {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        let _ = f;
+        unimplemented!()
+    }
+}
+
+impl Display for URLDetail {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         let _ = f;
         unimplemented!()

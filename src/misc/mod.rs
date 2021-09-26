@@ -6,6 +6,7 @@ pub mod config {
     pub const METADATA_FN: &str = "metadata.json";
     pub const DATABASE_FN: &str = "shiromana.db";
     pub const SHARED_DATABASE_FN: &str = "shared.db";
+    pub const THUMBNAIL_DATABASE_FN: &str = "thumbnail.db";
     pub const FINGERPRINT_FN: &str = ".shiromana";
     pub const DEFAULT_MEDIAS_FOLDER: &str = "medias";
     pub const MEDIAS_HASH_LEVEL: u32 = 1;
