@@ -1,16 +1,18 @@
-use std::{env, fmt, fs, path, str};
 use std::path::Path;
+use std::{env, fmt, fs, path, str};
 
-use rusqlite::Connection;
 use rusqlite::params;
+use rusqlite::Connection;
 use textwrap::indent;
 
 use crate::library::MediaSetType;
 use crate::media::*;
 
-use super::{Library, LibraryMetadata, LibrarySummary};
 use super::super::media::MediaType;
-use super::super::misc::{config, Error, HashAlgo, Lock, LockType, Result, tools, Uuid};
+// use super::super::misc::err_type_mismatch_expect_dir_found_file;
+use super::super::misc::{config, tools, Error, HashAlgo, Lock, LockType, Result, Uuid};
+use super::{Library, LibraryMetadata, LibrarySummary};
+use crate::err_type_mismatch_expect_dir_found_file;
 
 impl Library {
     pub fn open(path: String) -> Result<Library> {
@@ -23,29 +25,39 @@ impl Library {
         }
         match fs::read_dir(library_path) {
             Ok(files) => {
-                let to_check: Vec<&str> = vec![config::METADATA_FN,
-                                               config::FINGERPRINT_FN,
-                                               config::DATABASE_FN,
-                                               config::SHARED_DATABASE_FN]
-                    .iter().copied().collect();
-                let files_list = files.map(|entry| {
-                    let entry = entry.unwrap();
-                    let filename = entry.file_name().to_str().unwrap().to_string();
-                    filename
-                }).collect::<Vec<String>>();
-                if !to_check.iter().all(|item| files_list.contains(&item.to_string())) {
+                let to_check: Vec<&str> = vec![
+                    config::METADATA_FN,
+                    config::FINGERPRINT_FN,
+                    config::DATABASE_FN,
+                    config::SHARED_DATABASE_FN,
+                ]
+                .iter()
+                .copied()
+                .collect();
+                let files_list = files
+                    .map(|entry| {
+                        let entry = entry.unwrap();
+                        let filename = entry.file_name().to_str().unwrap().to_string();
+                        filename
+                    })
+                    .collect::<Vec<String>>();
+                if !to_check
+                    .iter()
+                    .all(|item| files_list.contains(&item.to_string()))
+                {
                     return Err(Error::NotMatch("Library structure not match.".to_string()));
                 }
             }
-            Err(_) => { panic!("Cannot read dir") }
+            Err(_) => {
+                panic!("Cannot read dir")
+            }
         }
         let lock: Lock = Lock::acquire(LockType::FolderLock, path.as_str())?;
 
         let current_workdir = std::env::current_dir()?;
         std::env::set_current_dir(&path)?;
-        let metadata: LibraryMetadata = serde_json::from_str(
-            fs::read_to_string(config::METADATA_FN)?.as_str()
-        )?;
+        let metadata: LibraryMetadata =
+            serde_json::from_str(fs::read_to_string(config::METADATA_FN)?.as_str())?;
 
         let library_uuid = fs::read_to_string(config::FINGERPRINT_FN)?;
         if library_uuid != metadata.UUID {
@@ -73,15 +85,23 @@ impl Library {
         })
     }
 
-    pub fn create(path: String, library_name: String, master_name: Option<String>, media_folder: Option<String>) -> Result<Library> {
+    pub fn create(
+        path: String,
+        library_name: String,
+        master_name: Option<String>,
+        media_folder: Option<String>,
+    ) -> Result<Library> {
         let library_path = path::PathBuf::from(path);
         let library_path = if library_path.is_absolute() {
             library_path
         } else {
             env::current_dir()?.join(library_path.as_path())
-        }.join(format!("{}.{}", library_name, config::LIBRARY_EXT));
+        }
+        .join(format!("{}.{}", library_name, config::LIBRARY_EXT));
         if library_path.exists() {
-            return Err(Error::AlreadyExists(library_path.to_str().unwrap().to_string()));
+            return Err(Error::AlreadyExists(
+                library_path.to_str().unwrap().to_string(),
+            ));
         }
         fs::create_dir(&library_path)?;
         let library_uuid = Uuid::new_v4();
@@ -93,7 +113,7 @@ impl Library {
                     config::DEFAULT_MEDIAS_FOLDER.to_string()
                 }
             }
-            None => config::DEFAULT_MEDIAS_FOLDER.to_string()
+            None => config::DEFAULT_MEDIAS_FOLDER.to_string(),
         };
         let metadata = LibraryMetadata {
             UUID: library_uuid.to_string(),
@@ -173,9 +193,11 @@ impl Library {
                     FOREIGN KEY(media_id) REFERENCES media(id),
                     CONSTRAINT unique_uuid_id UNIQUE (media_id, path)
                 );
-                ")?;
+                ",
+        )?;
         db.execute(
-            &format!("CREATE TABLE media_series_ref(
+            &format!(
+                "CREATE TABLE media_series_ref(
                     id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
                     media_id INTEGER NOT NULL,
                     series_uuid CHAR(36) NOT NULL,
@@ -184,11 +206,12 @@ impl Library {
                     FOREIGN KEY(series_uuid) REFERENCES series(uuid)
                     {}
                 );",
-                     if cfg!(feature = "no-duplication-in-series") {
-                         ",CONSTRAINT unique_uuid_id UNIQUE (series_uuid, media_id)"
-                     } else {
-                         ""
-                     }),
+                if cfg!(feature = "no-duplication-in-series") {
+                    ",CONSTRAINT unique_uuid_id UNIQUE (series_uuid, media_id)"
+                } else {
+                    ""
+                }
+            ),
             params![],
         )?;
         db.execute(
@@ -198,7 +221,8 @@ impl Library {
         )?;
         let shared_db = Connection::open(config::SHARED_DATABASE_FN)?;
         let thumbnail_db = Connection::open(config::THUMBNAIL_DATABASE_FN)?;
-        thumbnail_db.execute_batch("
+        thumbnail_db.execute_batch(
+            "
             CREATE TABLE metadata(
                     library_uuid CHAR(36) PRIMARY KEY NOT NULL UNIQUE
                 );
@@ -206,7 +230,7 @@ impl Library {
                     id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
                     data BLOB
                 );;
-                "
+                ",
         )?;
         thumbnail_db.execute(
             "INSERT INTO metadata (library_uuid) VALUES (?);",
@@ -237,29 +261,47 @@ impl Library {
         })
     }
 
-    pub fn add_media(&mut self, path: String, kind: MediaType, sub_kind: Option<String>,
-                     kind_addition: Option<String>, caption: Option<String>,
-                     comment: Option<String>) -> Result<u64> {
+    pub fn add_media(
+        &mut self,
+        path: String,
+        kind: MediaType,
+        sub_kind: Option<String>,
+        kind_addition: Option<String>,
+        caption: Option<String>,
+        comment: Option<String>,
+    ) -> Result<u64> {
         if let MediaType::URL = kind {
             return self.add_url(path, sub_kind, kind_addition, caption, comment);
         }
         let media_path = path::PathBuf::from(path);
         if !media_path.is_file() {
-            return Err(err_type_mismatch_expect_dir_found_file!(media_path.to_str().unwrap().to_string()));
+            return Err(err_type_mismatch_expect_dir_found_file!(media_path
+                .to_str()
+                .unwrap()
+                .to_string()));
         }
-        let file_hash = self.hash_algo.do_hash(media_path.to_str().unwrap().to_string())?;
+        let file_hash = self
+            .hash_algo
+            .do_hash(media_path.to_str().unwrap().to_string())?;
         let file_name = media_path.file_name().unwrap().to_str().unwrap();
         let new_path = self.get_media_path_by_hash(&file_hash);
         if new_path.exists() {
             // We believe that no collision on images
-            let id = self.query_media(&format!("hash = '{}'", file_hash))
-                .map_err(|e| Error::AlreadyExists(file_hash.clone() + "," + e.to_string().as_str()))?
+            let id = self
+                .query_media(&format!("hash = '{}'", file_hash))
+                .map_err(|e| {
+                    Error::AlreadyExists(file_hash.clone() + "," + e.to_string().as_str())
+                })?
                 .first()
                 .map(|v| *v);
             return if let Some(id) = id {
                 let _ = self.db.execute(
                     "INSERT INTO media_location_ref (media_id, path, filename) VALUES (?,?,?);",
-                    params![id, media_path.canonicalize()?.to_str(), media_path.file_stem().unwrap().to_str()],
+                    params![
+                        id,
+                        media_path.canonicalize()?.to_str(),
+                        media_path.file_stem().unwrap().to_str()
+                    ],
                 ); // ignore fails
                 Err(Error::AlreadyExists(id.to_string()))
             } else {
@@ -280,14 +322,23 @@ impl Library {
         // insert into location ref
         let _ = self.db.execute(
             "INSERT INTO media_location_ref (media_id, path, filename) VALUES (?,?,?);",
-            params![id, media_path.canonicalize()?.to_str(), media_path.file_stem().unwrap().to_str()],
+            params![
+                id,
+                media_path.canonicalize()?.to_str(),
+                media_path.file_stem().unwrap().to_str()
+            ],
         ); // ignore fails
         Ok(id)
     }
 
-    pub fn add_url(&mut self, url: String, sub_kind: Option<String>,
-                   kind_addition: Option<String>, caption: Option<String>,
-                   comment: Option<String>) -> Result<u64> {
+    pub fn add_url(
+        &mut self,
+        url: String,
+        sub_kind: Option<String>,
+        kind_addition: Option<String>,
+        caption: Option<String>,
+        comment: Option<String>,
+    ) -> Result<u64> {
         let hash = self.hash_algo.do_hash_str(&url)?;
         self.db.execute(
             "INSERT INTO media (hash, filename, filesize, caption, type, sub_type, type_addition, comment)
@@ -303,20 +354,17 @@ impl Library {
         let (file_hash, file_size): (String, usize) = self.db.query_row(
             "SELECT hash, filesize FROM media WHERE id = ?;",
             params![&id],
-            |row| {
-                Ok((row.get(0)?, row.get(2)?))
-            },
+            |row| Ok((row.get(0)?, row.get(1)?)),
         )?;
         let media_file = self.get_media_path_by_hash(&file_hash);
         println!("{}", media_file.to_str().unwrap().to_string());
         if !media_file.is_file() {
             panic!("Media file is not exists or not a regular file.");
         }
-        self.db.execute(
-            "DELETE FROM media WHERE id = ?;",
-            params![id],
-        )?;
-        fs::remove_file(media_file)?;
+        self.db
+            .execute("DELETE FROM media WHERE id = ?;", params![id])?;
+        fs::remove_file(&media_file)?;
+        println!("Removed {:?}", media_file);
         self.summary.media_size -= file_size;
         self.summary.media_count -= 1;
         // TODO: REMOVE series and tag notation
@@ -339,7 +387,10 @@ impl Library {
                 |row| Ok(row.get(0)?),
             )?;
             if !is_that_media_exists {
-                return Err(Error::NotExists(format!("Media with Hash {} do not exists.", media.hash)));
+                return Err(Error::NotExists(format!(
+                    "Media with Hash {} do not exists.",
+                    media.hash
+                )));
             }
             fs::remove_file(&media.filepath)?;
             self.summary.media_size -= media.filesize;
@@ -353,10 +404,9 @@ impl Library {
             media.filesize = new_media.filesize;
             media.filename = new_media.filename;
             media.filepath = new_media.filepath;
-            self.db.execute(
-                "DELETE FROM media WHERE id = ?;",
-                params![new_media.id],
-            )?; // drop new media from database
+            self.db
+                .execute("DELETE FROM media WHERE id = ?;", params![new_media.id])?;
+            // drop new media from database
         }
         if let Some(detail) = &media.detail {
             let is_detail_exists: bool = self.db.query_row(
@@ -387,16 +437,22 @@ impl Library {
         Ok(())
     }
 
-    pub fn create_set(&mut self, kind: MediaSetType, caption: String, comment: Option<String>) -> Result<Uuid> {
+    pub fn create_set(
+        &mut self,
+        kind: MediaSetType,
+        caption: String,
+        comment: Option<String>,
+    ) -> Result<Uuid> {
         let uuid = Uuid::new_v4();
         self.db.execute(
-            &format!("INSERT INTO {} (uuid, caption, comment, media_count) VALUES (?, ?, ?, 0);",
-                     match kind {
-                         MediaSetType::Series => "series",
-                         MediaSetType::Tag => "tags"
-                     }),
-            params![
-                uuid, caption, comment],
+            &format!(
+                "INSERT INTO {} (uuid, caption, comment, media_count) VALUES (?, ?, ?, 0);",
+                match kind {
+                    MediaSetType::Series => "series",
+                    MediaSetType::Tag => "tags",
+                }
+            ),
+            params![uuid, caption, comment],
         )?;
         match kind {
             MediaSetType::Series => self.summary.series_count += 1,
@@ -409,10 +465,12 @@ impl Library {
         self.db.execute(
             "DELETE FROM {} WHERE uuid = ?;",
             params![
-        match kind {
-        MediaSetType::Series => "series",
-        MediaSetType::Tag => "tags"
-        }, uuid],
+                match kind {
+                    MediaSetType::Series => "series",
+                    MediaSetType::Tag => "tags",
+                },
+                uuid
+            ],
         )?;
         self.db.execute(
             match kind {
@@ -437,35 +495,47 @@ impl Library {
 
     // Return (Series_UUID, Tag_UUID)
     pub fn get_set_by_name(&self, caption: String) -> Result<(Option<Uuid>, Option<Uuid>)> {
-        let series_uuid: Option<Uuid> = self.db.query_row(
-            "SELECT uuid FROM series WHERE caption = ?;",
-            params![caption],
-            |row| Ok(row.get(0)?),
-        ).unwrap_or(None);
-        let tag_uuid: Option<Uuid> = self.db.query_row(
-            "SELECT uuid FROM tags WHERE caption = ?;",
-            params![caption],
-            |row| Ok(row.get(0)?),
-        ).unwrap_or(None);
+        let series_uuid: Option<Uuid> = self
+            .db
+            .query_row(
+                "SELECT uuid FROM series WHERE caption = ?;",
+                params![caption],
+                |row| Ok(row.get(0)?),
+            )
+            .unwrap_or(None);
+        let tag_uuid: Option<Uuid> = self
+            .db
+            .query_row(
+                "SELECT uuid FROM tags WHERE caption = ?;",
+                params![caption],
+                |row| Ok(row.get(0)?),
+            )
+            .unwrap_or(None);
         Ok((series_uuid, tag_uuid))
     }
 
-    pub fn add_to_set(&mut self, kind: MediaSetType, id: u64, uuid: &Uuid, no: Option<u64>, unsorted: bool) -> Result<()> {
+    pub fn add_to_set(
+        &mut self,
+        kind: MediaSetType,
+        id: u64,
+        uuid: &Uuid,
+        no: Option<u64>,
+        unsorted: bool,
+    ) -> Result<()> {
         match kind {
             MediaSetType::Series => {
                 let mut stmt = self.db.prepare(
                     "SELECT series_no FROM media_series_ref WHERE series_uuid = ?1 AND media_id != ?2;"
                 )?;
-                let iter = stmt.query_map(
-                    params![uuid, id],
-                    |row| {
-                        row.get(0)
-                    })?;
+                let iter = stmt.query_map(params![uuid, id], |row| row.get(0))?;
                 let to_check: Vec<u64> = iter.map(|x| x.unwrap()).collect();
                 let no = if let Some(no) = no {
                     // if the no is specified.
-                    if to_check.iter().any(|i| { *i == no }) {
-                        return Err(Error::Occupied(format!("occupied when add media(id {}) to series {} with no {}", id, uuid, no)));
+                    if to_check.iter().any(|i| *i == no) {
+                        return Err(Error::Occupied(format!(
+                            "occupied when add media(id {}) to series {} with no {}",
+                            id, uuid, no
+                        )));
                     }
                     Some(no)
                 } else {
@@ -477,7 +547,7 @@ impl Library {
                         let biggest = to_check.iter().max();
                         Some(match biggest {
                             Some(m) => m + 1,
-                            None => 1
+                            None => 1,
                         })
                     }
                 };
@@ -506,38 +576,47 @@ impl Library {
 
     pub fn remove_from_set(&mut self, kind: MediaSetType, id: u64, uuid: &Uuid) -> Result<()> {
         self.db.execute(
-            &format!("DELETE FROM media_{}_ref WHERE media_id = ? AND series_uuid = ?;",
-                     match kind {
-                         MediaSetType::Series => "series",
-                         MediaSetType::Tag => "tags",
-                     }),
+            &format!(
+                "DELETE FROM media_{}_ref WHERE media_id = ? AND series_uuid = ?;",
+                match kind {
+                    MediaSetType::Series => "series",
+                    MediaSetType::Tag => "tags",
+                }
+            ),
             params![id, uuid],
         )?;
         self.db.execute(
-            &format!("UPDATE {} SET media_count = media_count - 1 WHERE uuid = ?;",
-                     match kind {
-                         MediaSetType::Series => "series",
-                         MediaSetType::Tag => "tags",
-                     }),
+            &format!(
+                "UPDATE {} SET media_count = media_count - 1 WHERE uuid = ?;",
+                match kind {
+                    MediaSetType::Series => "series",
+                    MediaSetType::Tag => "tags",
+                }
+            ),
             params![uuid],
         )?;
         Ok(())
     }
 
-    pub fn update_series_no(&mut self, id: u64, series_uuid: &Uuid, no: u64, insert: bool) -> Result<()> {
+    pub fn update_series_no(
+        &mut self,
+        id: u64,
+        series_uuid: &Uuid,
+        no: u64,
+        insert: bool,
+    ) -> Result<()> {
         let mut stmt = self.db.prepare(
-            "SELECT series_no FROM media_series_ref WHERE series_uuid = ?1 AND media_id != ?2;"
+            "SELECT series_no FROM media_series_ref WHERE series_uuid = ?1 AND media_id != ?2;",
         )?;
-        let iter = stmt.query_map(
-            params![series_uuid, id],
-            |row| {
-                row.get(0)
-            })?;
+        let iter = stmt.query_map(params![series_uuid, id], |row| row.get(0))?;
         let to_check: Vec<u64> = iter.map(|x| x.unwrap()).collect();
-        if to_check.iter().any(|i| { *i == no }) {
+        if to_check.iter().any(|i| *i == no) {
             // insert or error
             if !insert {
-                return Err(Error::Occupied(format!("occupied when add media(id {}) to series {} with no {}", id, series_uuid, no)));
+                return Err(Error::Occupied(format!(
+                    "occupied when add media(id {}) to series {} with no {}",
+                    id, series_uuid, no
+                )));
             }
             self.db.execute(
                 "UPDATE media_series_ref SET series_no = series_no + 1 WHERE series_uuid = ? AND series_no >= ?;",
@@ -553,11 +632,12 @@ impl Library {
 
     pub fn trim_series_no(&mut self, uuid: &Uuid) -> Result<()> {
         // I sincerely recommend you not to use this function as much as possible
-        let mut ids: Vec<(u64, u64)> = self.db.prepare(
-            "SELECT media_id, series_no FROM media_series_ref WHERE series_uuid = ?;")?.query_map(
-            params![uuid],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )?.map(|x| x.unwrap()).collect();
+        let mut ids: Vec<(u64, u64)> = self
+            .db
+            .prepare("SELECT media_id, series_no FROM media_series_ref WHERE series_uuid = ?;")?
+            .query_map(params![uuid], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .map(|x| x.unwrap())
+            .collect();
         ids.sort_by(|a, b| a.1.cmp(&b.1));
         ids[0].1 = 1;
         for i in 1..ids.len() {
@@ -574,50 +654,48 @@ impl Library {
 
     pub fn get_media(&self, id: u64) -> Result<Media> {
         // TODO: figure out the time spend on selecting one column and more.
-        let mut media =
-            self.db.query_row(
-                "SELECT
+        let mut media = self.db.query_row(
+            "SELECT
                         hash, filename, filesize, caption, time_add,
                         type, sub_type, type_addition, comment
                       FROM media WHERE id = ?;",
-                params![id],
-                |row|
-                    {
-                        let hash: String = row.get(0)?;
-                        let file_name = row.get(1)?;
-                        let filepath = self.get_media_path_by_hash(&hash);
-                        let filepath = filepath.to_str().unwrap().to_string();
-                        let series_uuids: Vec<Uuid> = self.db.prepare(
-                            "SELECT series_uuid FROM media_series_ref WHERE media_id = ?;")?
-                            .query_map(params![id],
-                                       |row| Ok(row.get(0)?))?
-                            .map(|x| x.unwrap())
-                            .collect();
-                        let tags_uuids: Vec<Uuid> = self.db.prepare(
-                            "SELECT tags_uuid FROM media_tags_ref WHERE media_id = ?;")?
-                            .query_map(params![id],
-                                       |row| Ok(row.get(0)?))?
-                            .map(|x| x.unwrap())
-                            .collect();
-                        Ok(Media {
-                            id,
-                            library_uuid: self.uuid.clone(),
-                            hash,
-                            filename: file_name,
-                            filepath,
-                            filesize: row.get(2)?,
-                            caption: row.get(3)?,
-                            time_add: row.get(4)?,
-                            kind: row.get(5)?,
-                            sub_kind: row.get(6)?,
-                            kind_addition: row.get(7)?,
-                            comment: row.get(8)?,
-                            series: series_uuids,
-                            tag: tags_uuids,
-                            detail: None,
-                        })
-                    },
-            )?;
+            params![id],
+            |row| {
+                let hash: String = row.get(0)?;
+                let file_name = row.get(1)?;
+                let filepath = self.get_media_path_by_hash(&hash);
+                let filepath = filepath.to_str().unwrap().to_string();
+                let series_uuids: Vec<Uuid> = self
+                    .db
+                    .prepare("SELECT series_uuid FROM media_series_ref WHERE media_id = ?;")?
+                    .query_map(params![id], |row| Ok(row.get(0)?))?
+                    .map(|x| x.unwrap())
+                    .collect();
+                let tags_uuids: Vec<Uuid> = self
+                    .db
+                    .prepare("SELECT tags_uuid FROM media_tags_ref WHERE media_id = ?;")?
+                    .query_map(params![id], |row| Ok(row.get(0)?))?
+                    .map(|x| x.unwrap())
+                    .collect();
+                Ok(Media {
+                    id,
+                    library_uuid: self.uuid.clone(),
+                    hash,
+                    filename: file_name,
+                    filepath,
+                    filesize: row.get(2)?,
+                    caption: row.get(3)?,
+                    time_add: row.get(4)?,
+                    kind: row.get(5)?,
+                    sub_kind: row.get(6)?,
+                    kind_addition: row.get(7)?,
+                    comment: row.get(8)?,
+                    series: series_uuids,
+                    tag: tags_uuids,
+                    detail: None,
+                })
+            },
+        )?;
 
         let is_detailed: bool = self.db.query_row(
             "SELECT EXISTS(SELECT 1 FROM media_detail WHERE id = ?);",
@@ -631,9 +709,7 @@ impl Library {
                 |row| Ok(row.get(0)?),
             )?;
 
-            media.detail = Some(
-                serde_json::from_str(&detail)?
-            );
+            media.detail = Some(serde_json::from_str(&detail)?);
         }
 
         Ok(media)
@@ -649,38 +725,44 @@ impl Library {
         let filename_stem = Path::new(&filename).file_stem().unwrap().to_str().unwrap();
 
         let mut result: Vec<u64> = vec![];
-        let id_fn: Vec<(u64, String)> = self.db.prepare(
-            "SELECT id, filename FROM media_location_ref WHERE filename LIKE ? ESCAPE '\\';"
-        )?.query_map(
-            params![filename_stem.replace("%", "\\%") + "%"],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )?.map(|x| x.unwrap()).collect();
+        let id_fn: Vec<(u64, String)> = self
+            .db
+            .prepare(
+                "SELECT id, filename FROM media_location_ref WHERE filename LIKE ? ESCAPE '\\';",
+            )?
+            .query_map(params![filename_stem.replace("%", "\\%") + "%"], |row| {
+                Ok((row.get(0)?, row.get(1)?))
+            })?
+            .map(|x| x.unwrap())
+            .collect();
 
         for v in id_fn.iter() {
             if v.1 == filename_stem || v.1 == filename {
                 result.push(v.0);
             }
-        };
+        }
         result.sort();
         result.dedup();
         Ok(result)
     }
 
     pub fn get_next_no_in_series(&self, uuid: &Uuid) -> Result<Option<u64>> {
-        let max_no: Option<u64> =
-            self.db.prepare(
-                "SELECT MAX(series_no) as max_no FROM media_series_ref WHERE series_uuid = ?;"
+        let max_no: Option<u64> = self
+            .db
+            .prepare(
+                "SELECT MAX(series_no) as max_no FROM media_series_ref WHERE series_uuid = ?;",
             )?
-                .query_row(params![uuid], |row| Ok(row.get(0)?))?;
+            .query_row(params![uuid], |row| Ok(row.get(0)?))?;
         Ok(max_no.map(|v| v + 1))
     }
 
     pub fn query_media(&self, sql_stmt: &str) -> Result<Vec<u64>> {
-        Ok(
-            self.db.prepare(&format!("SELECT id FROM media WHERE {};", sql_stmt))?
-                .query_map(params![],
-                           |row| Ok(row.get(0)?))?
-                .map(|x| x.unwrap()).collect())
+        Ok(self
+            .db
+            .prepare(&format!("SELECT id FROM media WHERE {};", sql_stmt))?
+            .query_map(params![], |row| Ok(row.get(0)?))?
+            .map(|x| x.unwrap())
+            .collect())
     }
 
     pub fn query_series(&self, sql_stmt: &str) -> Result<Vec<Uuid>> {
@@ -728,10 +810,13 @@ impl Drop for Library {
             hash_algo: self.hash_algo.to_string(),
             media_folder: self.media_folder.clone(),
         };
-        fs::write(path::PathBuf::new().
-            join(&self.path[..]).
-            join(config::METADATA_FN),
-                  serde_json::to_string(&metadata).expect("Cannot serialize metadata.")).expect("Cannot write to metadata.");
+        fs::write(
+            path::PathBuf::new()
+                .join(&self.path[..])
+                .join(config::METADATA_FN),
+            serde_json::to_string(&metadata).expect("Cannot serialize metadata."),
+        )
+        .expect("Cannot write to metadata.");
     }
 }
 
@@ -755,8 +840,6 @@ impl Library {
             .join(self.path.as_str())
             .join(&self.media_folder)
             .join(&hash[..2])
-            .join(format!("{}",
-                          &hash[2..],
-            ))
+            .join(format!("{}", &hash[2..],))
     }
 }

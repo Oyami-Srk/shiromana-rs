@@ -1,6 +1,6 @@
-pub mod misc;
 pub mod library;
 pub mod media;
+pub mod misc;
 
 #[cfg(test)]
 #[allow(dead_code, unused)]
@@ -38,16 +38,81 @@ mod tests {
         println!("test!");
         println!("test2!");
         fs::remove_dir_all("test.mlib");
-        let lib = match Library::create(".".to_string(), "test".to_string(), None, Some("Mass".to_string())) {
+        let lib = match Library::create(
+            ".".to_string(),
+            "test".to_string(),
+            None,
+            Some("Mass".to_string()),
+        ) {
             Ok(mut v) => {
-                let id1 = v.add_media("test/1.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
-                let id2 = v.add_media("test/2.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
-                let id3 = v.add_media("test/3.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
-                v.remove_media(id2);
-                let id2 = v.add_media("test/2.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
-                let id4 = v.add_media("test/4.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
-                let id5 = v.add_media("test/5.jpg".to_string(), MediaType::Image, None, None, None, None).expect("??");
-                let series_uuid = v.create_set(MediaSetType::Series, "test".to_string(), Some("for_test".to_string())).unwrap();
+                let id1 = v
+                    .add_media(
+                        "test/1.jpg".to_string(),
+                        MediaType::Image,
+                        None,
+                        None,
+                        None,
+                        None,
+                    )
+                    .expect("??");
+                let id2 = v
+                    .add_media(
+                        "test/2.jpg".to_string(),
+                        MediaType::Image,
+                        None,
+                        None,
+                        None,
+                        None,
+                    )
+                    .expect("??");
+                let id3 = v
+                    .add_media(
+                        "test/3.jpg".to_string(),
+                        MediaType::Image,
+                        None,
+                        None,
+                        None,
+                        None,
+                    )
+                    .expect("??");
+                v.remove_media(id2).unwrap();
+                let id2 = v
+                    .add_media(
+                        "test/2.jpg".to_string(),
+                        MediaType::Image,
+                        None,
+                        None,
+                        None,
+                        None,
+                    )
+                    .expect("??");
+                let id4 = v
+                    .add_media(
+                        "test/4.jpg".to_string(),
+                        MediaType::Image,
+                        None,
+                        None,
+                        None,
+                        None,
+                    )
+                    .expect("??");
+                let id5 = v
+                    .add_media(
+                        "test/5.jpg".to_string(),
+                        MediaType::Image,
+                        None,
+                        None,
+                        None,
+                        None,
+                    )
+                    .expect("??");
+                let series_uuid = v
+                    .create_set(
+                        MediaSetType::Series,
+                        "test".to_string(),
+                        Some("for_test".to_string()),
+                    )
+                    .unwrap();
                 println!("Create new series with uuid: {}", series_uuid);
                 v.add_to_set(MediaSetType::Series, id1, &series_uuid, Some(9), false);
                 v.add_to_set(MediaSetType::Series, id2, &series_uuid, Some(2), false);
@@ -57,13 +122,27 @@ mod tests {
                 v.trim_series_no(&series_uuid);
                 assert_eq!(v.get_next_no_in_series(&series_uuid).unwrap(), Some(4));
 
-                v.add_url("https://doc.rust-lang.org/stable/std/index.html".into(), None, None, None, None);
+                v.add_url(
+                    "https://doc.rust-lang.org/stable/std/index.html".into(),
+                    None,
+                    None,
+                    None,
+                    None,
+                );
 
                 println!("{}", v);
                 let media1 = v.get_media(id1).unwrap();
                 let media2 = v.get_media(id2).unwrap();
-                println!("Media Info ( ID {} ):\n{}", id1, textwrap::indent(&format!("{}", media1), "    "));
-                println!("Media Info ( ID {} ):\n{}", id2, textwrap::indent(&format!("{}", media2), "    "));
+                println!(
+                    "Media Info ( ID {} ):\n{}",
+                    id1,
+                    textwrap::indent(&format!("{}", media1), "    ")
+                );
+                println!(
+                    "Media Info ( ID {} ):\n{}",
+                    id2,
+                    textwrap::indent(&format!("{}", media2), "    ")
+                );
                 if true {
                     println!("Trying to adding huge amount of files.");
                     let begin = chrono::Local::now();
@@ -91,4 +170,3 @@ mod tests {
         };
     }
 }
-
