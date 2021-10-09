@@ -11,6 +11,7 @@ pub struct LibrarySummary {
 
 
 #[derive(Debug)]
+#[repr(C)]
 pub struct Library {
     pub(crate) db: rusqlite::Connection,
     pub(crate) shared_db: rusqlite::Connection,

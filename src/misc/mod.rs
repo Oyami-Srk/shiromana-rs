@@ -34,6 +34,7 @@ pub enum Error {
     JsonError(serde_json::Error),
     Other(String),
     MediaDecode(String),
+    Plugin(plugin::PluginError),
     NoneError,
 }
 

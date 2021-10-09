@@ -26,7 +26,8 @@ impl std::fmt::Display for Error {
             LockError(s) => write!(f, "{}", s),
             JsonError(e) => write!(f, "Error when processing json. {}", e),
             NoneError => write!(f, "Some values goes none."), // TODO: indicated error msg
-            MediaDecode(s) => write!(f, "Media decode error: {}", s)
+            MediaDecode(s) => write!(f, "Media decode error: {}", s),
+            Plugin(err) => write!(f, "Plugin Error: {}", err)
         }
     }
 }
@@ -56,5 +57,11 @@ impl From<::uuid::Error> for Error {
 impl From<image::ImageError> for Error {
     fn from(err: image::ImageError) -> Self {
         Error::MediaDecode(format!("{}", err))
+    }
+}
+
+impl From<plugin::PluginError> for Error {
+    fn from(err: plugin::PluginError) -> Self {
+        Error::Plugin(err)
     }
 }
