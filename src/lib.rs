@@ -1,6 +1,7 @@
 pub mod library;
 pub mod media;
 pub mod misc;
+pub mod plugin;
 
 #[cfg(test)]
 #[allow(dead_code, unused)]
@@ -34,7 +35,7 @@ mod tests {
     }
 
     #[test]
-    fn __it_works() {
+    fn bunch_add_test() {
         println!("test!");
         println!("test2!");
         fs::remove_dir_all("test.mlib");
@@ -166,6 +167,23 @@ mod tests {
             Err(e) => {
                 println!("{}", e);
                 panic!("Error");
+            }
+        };
+    }
+
+    #[test]
+    fn tets_plugin() {
+        fs::remove_dir_all("test.mlib");
+        let lib = match Library::create(
+            ".".to_string(),
+            "test".to_string(),
+            None,
+            Some("TestFolder".to_string()),
+        ) {
+            Ok(lib) => {
+            },
+            Err(e) => {
+                panic!(e)
             }
         };
     }

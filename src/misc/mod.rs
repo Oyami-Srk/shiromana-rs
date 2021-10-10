@@ -91,5 +91,4 @@ mod error;
 mod lock;
 mod hash;
 mod uuid;
-pub mod plugin;
 pub mod tools;

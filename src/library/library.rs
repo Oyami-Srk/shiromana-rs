@@ -12,6 +12,7 @@ use super::super::media::MediaType;
 // use super::super::misc::err_type_mismatch_expect_dir_found_file;
 use super::super::misc::{config, tools, Error, HashAlgo, Lock, LockType, Result, Uuid};
 use super::{Library, LibraryMetadata, LibrarySummary};
+use super::super::plugin::PluginManager;
 use crate::err_type_mismatch_expect_dir_found_file;
 
 impl Library {
