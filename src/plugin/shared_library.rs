@@ -10,8 +10,8 @@ impl PluginTrait for SharedLibrary {
     }
 }
 
-impl Plugin {
-    pub fn from_library(path: PathBuf) -> Result<SharedLibrary> {
+impl SharedLibrary {
+    pub fn new(path: PathBuf) -> Result<SharedLibrary> {
         let library = unsafe { libloading::Library::new(path).map_err(|e| PluginError::Load(e))? };
          move || -> std::result::Result<SharedLibrary, LibError> {
             unsafe {
