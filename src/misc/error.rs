@@ -60,8 +60,8 @@ impl From<image::ImageError> for Error {
     }
 }
 
-impl From<plugin::PluginError> for Error {
-    fn from(err: plugin::PluginError) -> Self {
+impl From<super::super::plugin::PluginError> for Error {
+    fn from(err: super::super::plugin::PluginError) -> Self {
         Error::Plugin(err)
     }
 }

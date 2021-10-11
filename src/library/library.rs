@@ -83,6 +83,7 @@ impl Library {
             summary: metadata.summary,
             hash_algo: HashAlgo::from_string(metadata.hash_algo)?,
             lock,
+            plugin_manager: PluginManager::new()
         })
     }
 
@@ -259,6 +260,7 @@ impl Library {
             },
             hash_algo: HashAlgo::from_string(config::DEFAULT_HASH_ALGO.to_string())?,
             lock,
+            plugin_manager: PluginManager::new()
         })
     }
 

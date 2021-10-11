@@ -25,7 +25,7 @@ pub struct Library {
     summary: LibrarySummary,
     hash_algo: super::misc::HashAlgo,
     lock: super::misc::Lock,
-    plugin_manager: super::misc::plugin::PluginManager
+    plugin_manager: super::plugin::PluginManager
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]

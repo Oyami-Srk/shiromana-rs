@@ -1,8 +1,8 @@
 use std::os::raw::c_char;
 use std::path::PathBuf;
 
-use super::super::library::Library;
-use super::Result;
+use super::library::Library;
+use super::misc::Result;
 
 use libloading;
 use libloading::{Error as LibError, Symbol};
@@ -34,6 +34,11 @@ pub enum PluginError {
     Load(LibError),
 }
 
+#[derive(Debug)]
 pub struct PluginManager {
     plugins: Vec<Box<dyn PluginTrait>>,
 }
+
+pub mod misc;
+pub mod plugin_manager;
+pub mod shared_library;
