@@ -8,6 +8,8 @@ pub mod plugin;
 mod tests {
     use std::collections::HashMap;
     use std::fs;
+    use std::path::Path;
+    use std::path::PathBuf;
 
     use sha1::Digest;
     use uuid::Uuid;
@@ -15,6 +17,7 @@ mod tests {
     use crate::library::*;
     use crate::media::*;
     use crate::misc::*;
+    use crate::plugin::*;
 
     // #[test]
     fn it_works() {
@@ -174,17 +177,23 @@ mod tests {
     #[test]
     fn tets_plugin() {
         fs::remove_dir_all("test.mlib");
-        let lib = match Library::create(
+        let mut lib = match Library::create(
             ".".to_string(),
             "test".to_string(),
             None,
             Some("TestFolder".to_string()),
         ) {
-            Ok(lib) => {
+            Ok(mut lib) => {
+                let plugin = super::plugin::SharedLibrary::new(
+                    PathBuf::from("plugin_test/plugin.so")
+                ).unwrap(); 
+                lib.plugin_manager.load(plugin);
+                lib
             },
             Err(e) => {
-                panic!(e)
+                panic!("{}", e)
             }
         };
+        println!("{:?}", lib.plugin_manager);
     }
 }

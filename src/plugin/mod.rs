@@ -26,7 +26,7 @@ type FuncOnUnload = extern "C" fn(*mut Library) -> u32;
 
 pub struct SharedLibrary {
     library: libloading::Library,
-    name: RawSymbol<FuncName>,
+    sym_name: RawSymbol<FuncName>,
 }
 
 #[derive(Debug)]

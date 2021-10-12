@@ -1,8 +1,14 @@
+use std::ffi::CStr;
+
 use super::*;
 
 impl PluginTrait for SharedLibrary {
     fn name(&self) -> &'static str {
-        todo!()
+        let p_str = (self.sym_name)();
+        let cstr = unsafe {
+            CStr::from_ptr(p_str)
+        };
+        cstr.to_str().unwrap()
     }
 
     fn trigger(&self) -> &'static str {
@@ -19,7 +25,7 @@ impl SharedLibrary {
                 let name= name.into_raw();
                 Ok(SharedLibrary {
                     library,
-                    name: name,
+                    sym_name: name,
                 })
             }
         }()
