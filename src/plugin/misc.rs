@@ -4,7 +4,7 @@ impl std::fmt::Display for PluginError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Load(err) => write!(f, "Loading Library Failed due to {}", err),
-            Self::Codec(err) => write!(f, "Convert to UTF8 Error due to {}", err)
+            Self::Codec(err) => write!(f, "Convert to UTF8 Error due to {}", err),
         }
     }
 }
@@ -52,7 +52,7 @@ impl std::str::FromStr for TriggerType {
             "query_media" => Self::QueryMedia,
             "query_set" => Self::QuerySet,
             "none" => Self::None,
-            _ => Self::None
+            _ => Self::None,
         })
     }
 }

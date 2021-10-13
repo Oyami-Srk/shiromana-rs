@@ -184,12 +184,12 @@ mod tests {
             Some("TestFolder".to_string()),
         ) {
             Ok(mut lib) => {
-                let plugin = super::plugin::SharedLibrary::new(
-                    PathBuf::from("plugin_test/plugin.so")
-                ).unwrap(); 
+                let plugin =
+                    super::plugin::SharedLibrary::new(PathBuf::from("plugin_test/plugin.so"))
+                        .unwrap();
                 lib.plugin_manager.load(plugin);
                 lib
-            },
+            }
             Err(e) => {
                 panic!("{}", e)
             }

@@ -1,5 +1,5 @@
-mod media;
 mod fmt;
+mod media;
 
 pub enum MediaUpdateKey {
     Filename,
@@ -20,7 +20,6 @@ pub enum MediaType {
     None = 99999,
 }
 
-
 impl MediaUpdateKey {
     pub fn to_key(&self) -> String {
         match self {
@@ -28,7 +27,7 @@ impl MediaUpdateKey {
             MediaUpdateKey::Caption => "caption".to_string(),
             MediaUpdateKey::SubType => "sub_type".to_string(),
             MediaUpdateKey::TypeAddition => "type_addition".to_string(),
-            MediaUpdateKey::Comment => "comment".to_string()
+            MediaUpdateKey::Comment => "comment".to_string(),
         }
     }
 }
@@ -67,7 +66,6 @@ pub enum TypesDetail {
     URL(URLDetail),
     Other,
 }
-
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub struct ImageDetail {

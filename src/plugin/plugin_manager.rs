@@ -32,12 +32,12 @@ impl PluginManager {
     pub fn trigger(&self, action: TriggerType, lib: &mut Library, media: &mut Media) -> Result<()> {
         self.plugins
             .iter()
-            .filter(|c| c.trigger().iter().any(|s| {
-                match s {
+            .filter(|c| {
+                c.trigger().iter().any(|s| match s {
                     action => true,
-                    _ => false
-                }
-            }))
+                    _ => false,
+                })
+            })
             .for_each(|e| {
                 let result = e.on_trigger(lib, media, action);
             });

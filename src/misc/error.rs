@@ -8,26 +8,25 @@ impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         use self::Error::*;
         match &self {
-            NotExists(s) =>
-                write!(f, "{} is not exists", s),
-            AlreadyExists(s) =>
-                write!(f, "{} is already exists.", s),
-            NotMatch(s) =>
-                write!(f, "Resource \"{}\" is not match.", s),
-            Occupied(s) =>
-                write!(f, "Resource \"{}\" is occupied.", s),
+            NotExists(s) => write!(f, "{} is not exists", s),
+            AlreadyExists(s) => write!(f, "{} is already exists.", s),
+            NotMatch(s) => write!(f, "Resource \"{}\" is not match.", s),
+            Occupied(s) => write!(f, "Resource \"{}\" is occupied.", s),
             NotIn { a, b } => write!(f, "{} is not in {}.", a, b),
             IO(e) => write!(f, "IO Error. ({})", e),
             DB(e) => write!(f, "Database Error. ({})", e),
             Other(s) => write!(f, "Other Error: {}", s),
-            TypeMismatch { val, expect, found } =>
-                write!(f, "Type Mismatch for {}. Expect {}, found {}.", val, expect, found),
+            TypeMismatch { val, expect, found } => write!(
+                f,
+                "Type Mismatch for {}. Expect {}, found {}.",
+                val, expect, found
+            ),
             Locked(s) => write!(f, "Resource \"{}\" is locked.", s),
             LockError(s) => write!(f, "{}", s),
             JsonError(e) => write!(f, "Error when processing json. {}", e),
             NoneError => write!(f, "Some values goes none."), // TODO: indicated error msg
             MediaDecode(s) => write!(f, "Media decode error: {}", s),
-            Plugin(err) => write!(f, "Plugin Error: {}", err)
+            Plugin(err) => write!(f, "Plugin Error: {}", err),
         }
     }
 }
@@ -51,7 +50,9 @@ impl From<serde_json::Error> for Error {
 }
 
 impl From<::uuid::Error> for Error {
-    fn from(err: ::uuid::Error) -> Self { Error::Other(format!("UUID error: {}", err)) }
+    fn from(err: ::uuid::Error) -> Self {
+        Error::Other(format!("UUID error: {}", err))
+    }
 }
 
 impl From<image::ImageError> for Error {

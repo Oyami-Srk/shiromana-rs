@@ -35,12 +35,14 @@ impl HashAlgo {
             "SHA1" => Ok(HashAlgo::SHA1),
             "SHA256" => Ok(HashAlgo::SHA256),
             "BLAKE3" => Ok(HashAlgo::BLAKE3),
-            _ => return Err(Error::NotExists(format!("Hash algo not exists: {}", s)))
+            _ => return Err(Error::NotExists(format!("Hash algo not exists: {}", s))),
         }
     }
 
     fn do_hash_for_reader<R: ?Sized>(algo: &HashAlgo, reader: &mut R) -> Result<String>
-        where R: std::io::Read {
+    where
+        R: std::io::Read,
+    {
         Ok(match algo {
             HashAlgo::MD5 => {
                 let mut hasher = Md5::new();
@@ -65,14 +67,16 @@ impl HashAlgo {
         })
     }
 
-
     pub fn do_hash(&self, file_path: String) -> Result<String> {
         let path = std::path::PathBuf::from(file_path);
         if !path.exists() {
             return Err(Error::NotExists(path.to_str().unwrap().to_string()));
         }
         if !path.is_file() {
-            return Err(err_type_mismatch_expect_dir_found_file!(path.to_str().unwrap().to_string()));
+            return Err(err_type_mismatch_expect_dir_found_file!(path
+                .to_str()
+                .unwrap()
+                .to_string()));
         }
         let mut file = fs::File::open(path)?;
         Self::do_hash_for_reader(self, &mut file)

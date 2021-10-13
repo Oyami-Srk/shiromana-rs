@@ -11,10 +11,8 @@ impl std::error::Error for LockError {}
 impl std::fmt::Display for LockError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            LockError::LockFailed(s) =>
-                write!(f, "Lock for \"{}\" is failed.", s),
-            LockError::UnlockFailed(s) =>
-                write!(f, "Unlock for \"{}\" is failed.", s),
+            LockError::LockFailed(s) => write!(f, "Lock for \"{}\" is failed.", s),
+            LockError::UnlockFailed(s) => write!(f, "Unlock for \"{}\" is failed.", s),
         }
     }
 }
@@ -23,14 +21,18 @@ impl Lock {
     // FileLock is not supported yet
     pub fn acquire(kind: LockType, location: &str) -> Result<Lock> {
         let lockfile_path: PathBuf = match &kind {
-            LockType::FileLock => { unimplemented!() }
+            LockType::FileLock => {
+                unimplemented!()
+            }
             LockType::FolderLock => {
                 let p = Path::new(location);
                 if !p.exists() {
                     return Err(Error::NotExists(location.to_string()));
                 }
                 if !p.is_dir() {
-                    return Err(err_type_mismatch_expect_dir_found_file!(location.to_string()));
+                    return Err(err_type_mismatch_expect_dir_found_file!(
+                        location.to_string()
+                    ));
                 }
                 let p = p.join(Path::new(".LOCK"));
                 if p.exists() {
@@ -53,14 +55,18 @@ impl Lock {
 
     fn release(&mut self) -> Result<()> {
         if !self.lock_file.exists() {
-            return Err(Error::LockError(LockError::UnlockFailed(self.lock_file.parent().
-                unwrap().to_str().unwrap().to_string())));
+            return Err(Error::LockError(LockError::UnlockFailed(
+                self.lock_file
+                    .parent()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string(),
+            )));
         }
         match self.kind {
             LockType::FileLock => unimplemented!(),
-            LockType::FolderLock => {
-                fs::remove_file(self.lock_file.as_path())?
-            }
+            LockType::FolderLock => fs::remove_file(self.lock_file.as_path())?,
         }
         self.status = LockStatus::Unlocked;
         Ok(())

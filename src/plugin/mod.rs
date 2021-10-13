@@ -6,12 +6,11 @@ use super::media::Media;
 use super::misc::Result;
 
 use libloading;
-use libloading::{Error as LibError, Symbol};
 #[cfg(unix)]
 use libloading::os::unix::Symbol as RawSymbol;
 #[cfg(windows)]
 use libloading::os::windows::Symbol as RawSymbol;
-
+use libloading::{Error as LibError, Symbol};
 
 pub trait PluginTrait {
     fn name(&self) -> &'static str;
@@ -39,7 +38,7 @@ pub struct SharedLibrary {
 #[derive(Debug)]
 pub enum PluginError {
     Load(LibError),
-    Codec(std::str::Utf8Error)
+    Codec(std::str::Utf8Error),
 }
 
 #[derive(Debug)]

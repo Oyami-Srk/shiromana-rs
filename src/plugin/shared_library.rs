@@ -35,13 +35,11 @@ impl SharedLibrary {
                 let trigger = trigger.into_raw();
                 let p_trigger_str = (trigger)();
                 let s = std::ffi::CStr::from_ptr(p_trigger_str);
-                let trigger =
-                    s.to_str().map_err(|e| PluginError::Codec(e)).unwrap();
-                let trigger_vec = trigger.split(',').map(
-                    |s| {
-                        TriggerType::from_str(s).unwrap()
-                    }
-                ).collect();
+                let trigger = s.to_str().map_err(|e| PluginError::Codec(e)).unwrap();
+                let trigger_vec = trigger
+                    .split(',')
+                    .map(|s| TriggerType::from_str(s).unwrap())
+                    .collect();
                 println!("{:?}", trigger_vec);
                 Ok(SharedLibrary {
                     library,

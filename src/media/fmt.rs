@@ -2,7 +2,9 @@ use std::fmt::{Display, Formatter, Result};
 
 use textwrap::indent;
 
-use crate::media::{AudioDetail, ImageDetail, MediaDetail, TextDetail, TypesDetail, URLDetail, VideoDetail};
+use crate::media::{
+    AudioDetail, ImageDetail, MediaDetail, TextDetail, TypesDetail, URLDetail, VideoDetail,
+};
 
 use super::Media;
 use super::MediaType;
@@ -16,7 +18,7 @@ impl Display for MediaType {
             MediaType::Video => write!(f, "Video"),
             MediaType::URL => write!(f, "URL"),
             MediaType::Other => write!(f, "Other"),
-            MediaType::None => write!(f, "None")
+            MediaType::None => write!(f, "None"),
         }
     }
 }
@@ -28,8 +30,13 @@ impl Display for Media {
         s.push_str(&format!(
             "Media ID: {}\nLibrary UUID: {}\nHash: {}\nFile name: {}\nAdd Time: {}\n\
             Media Type: {}\nMedia Size: {:.2} KB\n",
-            self.id, self.library_uuid, self.hash, self.filename, self.time_add,
-            self.kind, self.filesize / 1024,
+            self.id,
+            self.library_uuid,
+            self.hash,
+            self.filename,
+            self.time_add,
+            self.kind,
+            self.filesize / 1024,
         ));
 
         if let Some(v) = &self.caption {
@@ -68,7 +75,11 @@ impl Display for Media {
 impl Display for MediaDetail {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "{}\n", self.detail)?;
-        write!(f, "Other details: {}", serde_json::to_string_pretty(&self.other).unwrap())
+        write!(
+            f,
+            "Other details: {}",
+            serde_json::to_string_pretty(&self.other).unwrap()
+        )
     }
 }
 
@@ -80,14 +91,18 @@ impl Display for TypesDetail {
             TypesDetail::Audio(v) => write!(f, "{}", v),
             TypesDetail::Text(v) => write!(f, "{}", v),
             TypesDetail::URL(v) => write!(f, "{}", v),
-            TypesDetail::Other => write!(f, "Other has no specified detail field.")
+            TypesDetail::Other => write!(f, "Other has no specified detail field."),
         }
     }
 }
 
 impl Display for ImageDetail {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "Image Resolution: {} x {}\nImage Format: {}", self.width, self.height, self.format)
+        write!(
+            f,
+            "Image Resolution: {} x {}\nImage Format: {}",
+            self.width, self.height, self.format
+        )
     }
 }
 

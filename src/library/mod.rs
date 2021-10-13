@@ -1,5 +1,5 @@
-mod summary;
 mod library;
+mod summary;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct LibrarySummary {
@@ -8,7 +8,6 @@ pub struct LibrarySummary {
     pub tags_count: usize,
     pub media_size: usize,
 }
-
 
 #[derive(Debug)]
 #[repr(C)]
@@ -25,7 +24,7 @@ pub struct Library {
     summary: LibrarySummary,
     hash_algo: super::misc::HashAlgo,
     lock: super::misc::Lock,
-    pub(crate) plugin_manager: super::plugin::PluginManager
+    pub(crate) plugin_manager: super::plugin::PluginManager,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
