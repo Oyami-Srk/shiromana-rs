@@ -1,5 +1,5 @@
 use super::*;
-use std::str::FromStr;
+use std::{ops::DerefMut, str::FromStr};
 
 impl PluginTrait for SharedLibrary {
     fn name(&self) -> &'static str {
@@ -12,8 +12,11 @@ impl PluginTrait for SharedLibrary {
         &self.trigger_vec
     }
 
-    fn on_trigger(&self, lib: &mut Library, media: &mut Media, trigger_type: TriggerType) -> u32 {
-        (self.sym_on_trigger)(lib, media, trigger_type.to_string().as_ptr() as *const i8)
+    fn on_trigger(&self, lib: &mut Library, media: &Option<&mut Media>, trigger_type: TriggerType) -> u32 {
+        (self.sym_on_trigger)(lib, match media {
+            Some(m) =>  as *mut Media,
+            None => std::ptr::null::<Media>() as *mut Media
+        }, trigger_type.to_string().as_ptr() as *const i8)
     }
 
     fn on_load(&self, lib: &mut Library) -> u32 {

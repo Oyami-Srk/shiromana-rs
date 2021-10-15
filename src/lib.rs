@@ -188,7 +188,7 @@ mod tests {
                     super::plugin::SharedLibrary::new(PathBuf::from("plugin_test/plugin.so"))
                         .unwrap();
                 {
-                    lib.plugin_manager.load(&mut lib, plugin);
+                    lib.load_plugin(plugin);
                 }
                 lib
             }
@@ -196,6 +196,6 @@ mod tests {
                 panic!("{}", e)
             }
         };
-        println!("{:?}", lib.plugin_manager);
+        println!("{:?}", lib);
     }
 }

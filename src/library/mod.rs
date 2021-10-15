@@ -24,7 +24,7 @@ pub struct Library {
     summary: LibrarySummary,
     hash_algo: super::misc::HashAlgo,
     lock: super::misc::Lock,
-    pub(crate) plugin_manager: super::plugin::PluginManager,
+    pub(crate) plugins: Vec<Box<dyn super::plugin::PluginTrait>>
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]

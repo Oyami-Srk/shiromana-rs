@@ -11,7 +11,6 @@ use crate::media::*;
 use super::super::media::MediaType;
 // use super::super::misc::err_type_mismatch_expect_dir_found_file;
 use super::super::misc::{config, tools, Error, HashAlgo, Lock, LockType, Result, Uuid};
-use super::super::plugin::PluginManager;
 use super::{Library, LibraryMetadata, LibrarySummary};
 use crate::err_type_mismatch_expect_dir_found_file;
 
@@ -83,7 +82,7 @@ impl Library {
             summary: metadata.summary,
             hash_algo: HashAlgo::from_string(metadata.hash_algo)?,
             lock,
-            plugin_manager: PluginManager::new(),
+            plugins: Vec::new()
         })
     }
 
@@ -260,7 +259,7 @@ impl Library {
             },
             hash_algo: HashAlgo::from_string(config::DEFAULT_HASH_ALGO.to_string())?,
             lock,
-            plugin_manager: PluginManager::new(),
+            plugins: Vec::new()
         })
     }
 

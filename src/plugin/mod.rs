@@ -15,7 +15,7 @@ use libloading::{Error as LibError, Symbol};
 pub trait PluginTrait {
     fn name(&self) -> &'static str;
     fn trigger(&self) -> &Vec<TriggerType>;
-    fn on_trigger(&self, lib: &mut Library, media: &mut Media, trigger_type: TriggerType) -> u32;
+    fn on_trigger(&self, lib: &mut Library, media: &Option<&mut Media>, trigger_type: TriggerType) -> u32;
     fn on_load(&self, lib: &mut Library) -> u32;
     fn on_unload(&self, lib: &mut Library) -> u32;
 }
@@ -42,11 +42,6 @@ pub struct SharedLibrary {
 pub enum PluginError {
     Load(LibError),
     Codec(std::str::Utf8Error),
-}
-
-#[derive(Debug)]
-pub struct PluginManager {
-    plugins: Vec<Box<dyn PluginTrait>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
