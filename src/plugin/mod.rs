@@ -16,6 +16,8 @@ pub trait PluginTrait {
     fn name(&self) -> &'static str;
     fn trigger(&self) -> &Vec<TriggerType>;
     fn on_trigger(&self, lib: &mut Library, media: &mut Media, trigger_type: TriggerType) -> u32;
+    fn on_load(&self, lib: &mut Library) -> u32;
+    fn on_unload(&self, lib: &mut Library) -> u32;
 }
 
 pub struct Plugin {}
@@ -27,6 +29,7 @@ type FuncOnUnload = extern "C" fn(*mut Library) -> u32;
 type FuncOnTrigger = extern "C" fn(*mut Library, *mut Media, *const c_char) -> u32;
 
 pub struct SharedLibrary {
+    #[allow(unused)]
     library: libloading::Library,
     sym_name: RawSymbol<FuncName>,
     sym_on_trigger: RawSymbol<FuncOnTrigger>,
@@ -46,7 +49,7 @@ pub struct PluginManager {
     plugins: Vec<Box<dyn PluginTrait>>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TriggerType {
     None,
     MediaAdd,

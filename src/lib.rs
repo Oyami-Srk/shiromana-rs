@@ -187,7 +187,9 @@ mod tests {
                 let plugin =
                     super::plugin::SharedLibrary::new(PathBuf::from("plugin_test/plugin.so"))
                         .unwrap();
-                lib.plugin_manager.load(plugin);
+                {
+                    lib.plugin_manager.load(&mut lib, plugin);
+                }
                 lib
             }
             Err(e) => {

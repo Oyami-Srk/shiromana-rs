@@ -1,5 +1,5 @@
 use super::*;
-use std::{ops::Add, str::FromStr};
+use std::str::FromStr;
 
 impl PluginTrait for SharedLibrary {
     fn name(&self) -> &'static str {
@@ -14,6 +14,14 @@ impl PluginTrait for SharedLibrary {
 
     fn on_trigger(&self, lib: &mut Library, media: &mut Media, trigger_type: TriggerType) -> u32 {
         (self.sym_on_trigger)(lib, media, trigger_type.to_string().as_ptr() as *const i8)
+    }
+
+    fn on_load(&self, lib: &mut Library) -> u32 {
+        (self.sym_on_load)(lib)
+    }
+
+    fn on_unload(&self, lib: &mut Library) -> u32 {
+        (self.sym_on_unload)(lib)
     }
 }
 
