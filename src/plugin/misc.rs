@@ -62,3 +62,15 @@ impl std::fmt::Display for TriggerType {
         write!(f, "{}", self.to_string())
     }
 }
+
+impl TriggerType {
+    pub fn need_media(&self) -> bool {
+        match self {
+            Self::None => false,
+            Self::QuerySet => false,
+            Self::SetRemove => false,
+            Self::SetAdd => false,
+            _ => true,
+        }
+    }
+}

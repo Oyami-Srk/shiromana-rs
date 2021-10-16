@@ -15,7 +15,12 @@ use libloading::{Error as LibError, Symbol};
 pub trait PluginTrait {
     fn name(&self) -> &'static str;
     fn trigger(&self) -> &Vec<TriggerType>;
-    fn on_trigger(&self, lib: &mut Library, media: &Option<&mut Media>, trigger_type: TriggerType) -> u32;
+    fn on_trigger(
+        &self,
+        lib: &mut Library,
+        media: Option<&mut Media>,
+        trigger_type: TriggerType,
+    ) -> u32;
     fn on_load(&self, lib: &mut Library) -> u32;
     fn on_unload(&self, lib: &mut Library) -> u32;
 }
