@@ -1,5 +1,5 @@
-mod summary;
 mod library;
+mod summary;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct LibrarySummary {
@@ -9,9 +9,9 @@ pub struct LibrarySummary {
     pub media_size: usize,
 }
 
-
 #[derive(Debug)]
 pub struct Library {
+    pub version: semver::Version,
     pub(crate) db: rusqlite::Connection,
     pub(crate) shared_db: rusqlite::Connection,
     pub(crate) thumbnail_db: rusqlite::Connection,
@@ -24,6 +24,7 @@ pub struct Library {
     summary: LibrarySummary,
     hash_algo: super::misc::HashAlgo,
     lock: super::misc::Lock,
+    features: LibraryFeatures,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
@@ -42,4 +43,14 @@ pub struct LibraryMetadata {
 pub enum MediaSetType {
     Tag,
     Series,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq, Eq, Hash)]
+pub enum LibraryFeature {
+    None,
+}
+
+#[derive(Debug)]
+pub struct LibraryFeatures {
+    features: std::collections::HashSet<LibraryFeature>,
 }

@@ -1,18 +1,22 @@
+use std::collections::HashSet;
 use std::path::Path;
+use std::str::FromStr;
 use std::{env, fmt, fs, path, str};
 
 use rusqlite::params;
 use rusqlite::Connection;
 use textwrap::indent;
 
-use crate::library::MediaSetType;
+use crate::library::{LibraryFeatures, MediaSetType};
 use crate::media::*;
 
 use super::super::media::MediaType;
 // use super::super::misc::err_type_mismatch_expect_dir_found_file;
 use super::super::misc::{config, tools, Error, HashAlgo, Lock, LockType, Result, Uuid};
-use super::{Library, LibraryMetadata, LibrarySummary};
+use super::{Library, LibraryFeature, LibraryMetadata, LibrarySummary};
 use crate::err_type_mismatch_expect_dir_found_file;
+
+use semver;
 
 impl Library {
     pub fn open(path: String) -> Result<Library> {
@@ -69,7 +73,18 @@ impl Library {
         let path = std::env::current_dir()?.to_str().unwrap().to_string();
         std::env::set_current_dir(current_workdir)?;
 
+        let version: String = db.query_row("SELECT version FROM metadata", params![], |row| {
+            Ok(row.get(0)?)
+        })?;
+        let version = semver::Version::parse(version.as_str()).expect("Broken DB metadata");
+
+        let features: String = db.query_row("SELECT features FROM metadata", params![], |row| {
+            Ok(row.get(0)?)
+        })?;
+        let features = LibraryFeatures::from_str(features.as_str()).unwrap();
+
         Ok(Library {
+            version,
             db,
             shared_db,
             thumbnail_db,
@@ -82,6 +97,7 @@ impl Library {
             summary: metadata.summary,
             hash_algo: HashAlgo::from_string(metadata.hash_algo)?,
             lock,
+            features,
         })
     }
 
@@ -90,6 +106,7 @@ impl Library {
         library_name: String,
         master_name: Option<String>,
         media_folder: Option<String>,
+        features: LibraryFeatures,
     ) -> Result<Library> {
         let library_path = path::PathBuf::from(path);
         let library_path = if library_path.is_absolute() {
@@ -193,6 +210,11 @@ impl Library {
                     FOREIGN KEY(media_id) REFERENCES media(id),
                     CONSTRAINT unique_uuid_id UNIQUE (media_id, path)
                 );
+
+                CREATE TABLE metadata(
+                    version TEXT NOT NULL PRIMARY KEY NOT NULL UNIQUE,
+                    features TEXT NOT NULL PRIMARY KEY NOT NULL UNIQUE,
+                );
                 ",
         )?;
         db.execute(
@@ -223,7 +245,7 @@ impl Library {
         let thumbnail_db = Connection::open(config::THUMBNAIL_DATABASE_FN)?;
         thumbnail_db.execute_batch(
             "
-            CREATE TABLE metadata(
+                CREATE TABLE metadata(
                     library_uuid CHAR(36) PRIMARY KEY NOT NULL UNIQUE
                 );
                 CREATE TABLE thumbnail(
@@ -239,8 +261,18 @@ impl Library {
         fs::create_dir(&media_folder)?;
         env::set_current_dir(current_dir)?;
         let library_path = library_path.canonicalize()?;
+        let version = semver::Version::new(
+            env!("CARGO_PKG_VERSION_MAJOR").parse().unwrap(),
+            env!("CARGO_PKG_VERSION_MINOR").parse().unwrap(),
+            env!("CARGO_PKG_VERSION_PATCH").parse().unwrap(),
+        );
+        db.execute(
+            "INSERT INTO metadata (version, features) VALUES (?, ?);",
+            params![version.to_string(), features.to_string(),],
+        )?;
 
         Ok(Library {
+            version,
             db,
             shared_db,
             thumbnail_db,
@@ -258,6 +290,7 @@ impl Library {
             },
             hash_algo: HashAlgo::from_string(config::DEFAULT_HASH_ALGO.to_string())?,
             lock,
+            features,
         })
     }
 
@@ -841,5 +874,76 @@ impl Library {
             .join(&self.media_folder)
             .join(&hash[..2])
             .join(format!("{}", &hash[2..],))
+    }
+}
+
+impl FromStr for LibraryFeature {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        Ok(match s {
+            _ => Self::None,
+        })
+    }
+}
+
+impl std::fmt::Display for LibraryFeature {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::None => "None",
+            }
+        )
+    }
+}
+
+impl std::str::FromStr for LibraryFeatures {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        let features = s
+            .split(',')
+            .map(|s| {
+                LibraryFeature::from_str(s).expect(format!("Unsupported features: {}", s).as_str())
+            })
+            .collect();
+        Ok(Self { features })
+    }
+}
+
+impl std::fmt::Display for LibraryFeatures {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.features
+                .iter()
+                .map(|v| v.to_string())
+                .filter(|x| x != "")
+                .collect::<Vec<String>>()
+                .join(",")
+        )
+    }
+}
+
+impl LibraryFeatures {
+    pub fn new() -> Self {
+        Self {
+            features: HashSet::new(),
+        }
+    }
+
+    pub fn add(&mut self, feature: LibraryFeature) {
+        self.features.insert(feature);
+    }
+
+    pub fn remove(&mut self, feature: LibraryFeature) {
+        self.features.remove(&feature);
+    }
+
+    pub fn contains(&self, feature: LibraryFeature) -> bool{
+        self.features.contains(&feature)
     }
 }

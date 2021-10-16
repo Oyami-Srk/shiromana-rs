@@ -43,6 +43,7 @@ mod tests {
             "test".to_string(),
             None,
             Some("Mass".to_string()),
+            LibraryFeatures::new(),
         ) {
             Ok(mut v) => {
                 let id1 = v
