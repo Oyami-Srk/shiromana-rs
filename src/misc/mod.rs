@@ -1,6 +1,5 @@
 #![macro_use]
 
-
 pub mod config {
     pub const LIBRARY_EXT: &str = "mlib";
     pub const METADATA_FN: &str = "metadata.json";
@@ -15,6 +14,7 @@ pub mod config {
     // pub const DEFAULT_HASH_ALGO: &str = "MD5";
     pub const DEFAULT_HASH_ALGO: &str = "BLAKE3";
     pub const LOCKFILE: &str = ".LOCK";
+    pub const THUMBNAIL_SIZE: (u32, u32) = (200, 300); // WIDGHT HEIGHT
 }
 
 #[derive(Debug)]
@@ -25,9 +25,16 @@ pub enum Error {
     // file or dir
     Locked(String),
     NotMatch(String),
-    TypeMismatch { val: String, expect: String, found: String },
+    TypeMismatch {
+        val: String,
+        expect: String,
+        found: String,
+    },
     Occupied(String),
-    NotIn { a: String, b: String },
+    NotIn {
+        a: String,
+        b: String,
+    },
     IO(std::io::Error),
     DB(rusqlite::Error),
     LockError(LockError),
@@ -36,7 +43,6 @@ pub enum Error {
     MediaDecode(String),
     NoneError,
 }
-
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -67,11 +73,11 @@ pub struct Lock {
 
 #[macro_export]
 macro_rules! err_type_mismatch_expect_dir_found_file {
-    ( $v: expr)  => {
-        Error::TypeMismatch{
+    ( $v: expr) => {
+        Error::TypeMismatch {
             val: $v,
             expect: "Dir".to_string(),
-            found: "File".to_string()
+            found: "File".to_string(),
         }
     };
 }
@@ -83,11 +89,13 @@ pub enum HashAlgo {
     BLAKE3,
 }
 
-#[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd, Copy, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd, Copy, serde::Serialize, serde::Deserialize,
+)]
 pub struct Uuid(::uuid::Uuid);
 
 mod error;
-mod lock;
 mod hash;
-mod uuid;
+mod lock;
 pub mod tools;
+mod uuid;

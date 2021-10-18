@@ -48,6 +48,7 @@ pub enum MediaSetType {
 #[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq, Eq, Hash)]
 pub enum LibraryFeature {
     None,
+    GenerateThumbnailAtAdding
 }
 
 #[derive(Debug)]

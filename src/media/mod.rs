@@ -127,3 +127,7 @@ impl Default for AddingMediaParam {
         }
     }
 }
+
+pub struct Thumbnail {
+    image: image::DynamicImage
+}

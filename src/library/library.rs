@@ -1,10 +1,11 @@
 use std::collections::HashSet;
+use std::io::Write;
 use std::path::Path;
 use std::str::FromStr;
 use std::{env, fmt, fs, path, str};
 
-use rusqlite::params;
 use rusqlite::Connection;
+use rusqlite::{params, DatabaseName};
 use textwrap::indent;
 
 use crate::library::{LibraryFeatures, MediaSetType};
@@ -250,7 +251,8 @@ impl Library {
                 );
                 CREATE TABLE thumbnail(
                     id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
-                    data BLOB
+                    filename TEXT NOT NULL UNIQUE,
+                    image BLOB,
                 );;
                 ",
         )?;
@@ -361,6 +363,14 @@ impl Library {
                 media_path.file_stem().unwrap().to_str()
             ],
         ); // ignore fails
+           // check features
+        if self
+            .features
+            .contains(LibraryFeature::GenerateThumbnailAtAdding)
+        {
+            // generate thumbnail image at adding
+            self.make_thumbnail(id)?
+        }
         Ok(id)
     }
 
@@ -798,6 +808,24 @@ impl Library {
             .collect())
     }
 
+    pub fn make_thumbnail(&mut self, id: u64) -> Result<()> {
+        let media = self.get_media(id)?;
+        let thumbnail = media.thumbnail();
+        let mut buffer: Vec<u8> = Vec::new();
+        thumbnail.write(&mut buffer)?;
+        let thumb_size = buffer.len();
+        self.thumbnail_db.execute(
+            "INSERT INTO thumbnail (image) VALUES (ZEROBLOB(?))",
+            params![thumb_size],
+        )?;
+        let row_id = self.thumbnail_db.last_insert_rowid();
+        let mut blob =
+            self.thumbnail_db
+                .blob_open(DatabaseName::Main, "thumbnail", "image", row_id, false)?;
+        blob.write(&buffer)?;
+        Ok(())
+    }
+
     pub fn query_series(&self, sql_stmt: &str) -> Result<Vec<Uuid>> {
         let _ = sql_stmt;
         unimplemented!()
@@ -882,6 +910,8 @@ impl FromStr for LibraryFeature {
 
     fn from_str(s: &str) -> Result<Self> {
         Ok(match s {
+            "none" => Self::None,
+            "generate_thumbnail_at_adding" => Self::GenerateThumbnailAtAdding,
             _ => Self::None,
         })
     }
@@ -894,6 +924,7 @@ impl std::fmt::Display for LibraryFeature {
             "{}",
             match self {
                 Self::None => "None",
+                Self::GenerateThumbnailAtAdding => "generate_thumbnail_at_adding",
             }
         )
     }
@@ -943,7 +974,7 @@ impl LibraryFeatures {
         self.features.remove(&feature);
     }
 
-    pub fn contains(&self, feature: LibraryFeature) -> bool{
+    pub fn contains(&self, feature: LibraryFeature) -> bool {
         self.features.contains(&feature)
     }
 }
