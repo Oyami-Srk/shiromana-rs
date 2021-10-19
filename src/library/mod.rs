@@ -1,4 +1,7 @@
-mod library;
+mod lib_ops;
+mod media_ops;
+mod misc;
+mod series_ops;
 mod summary;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
@@ -48,7 +51,7 @@ pub enum MediaSetType {
 #[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq, Eq, Hash)]
 pub enum LibraryFeature {
     None,
-    GenerateThumbnailAtAdding
+    GenerateThumbnailAtAdding,
 }
 
 #[derive(Debug)]

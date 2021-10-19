@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
-use image::ImageFormat;
 use image::io::Reader as ImageReader;
+use image::ImageFormat;
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
 use serde::__private::TryFrom;
 
-use super::{*};
 use super::super::misc::{Error, Result};
+use super::*;
 
 impl Media {
     pub fn detailize(self, other: Option<HashMap<String, String>>) -> Media {
@@ -17,33 +17,42 @@ impl Media {
             MediaType::Audio => AudioDetail::get_detail(&self.filepath),
             MediaType::Video => VideoDetail::get_detail(&self.filepath),
             MediaType::URL => URLDetail::get_detail(&self.filepath),
-            MediaType::Other => return {
-                Media {
-                    detail: Some(MediaDetail {
-                        detail: TypesDetail::Other,
-                        other,
-                    }),
-                    ..self
+            MediaType::Other => {
+                return {
+                    Media {
+                        detail: Some(MediaDetail {
+                            detail: TypesDetail::Other,
+                            other,
+                        }),
+                        ..self
+                    }
                 }
-            },
-            MediaType::None => return self
+            }
+            MediaType::None => return self,
         };
         match &detail {
             Ok(_) => {}
-            Err(e) => { println!("{}", e); }
+            Err(e) => {
+                println!("{}", e);
+            }
         }
         if detail.is_err() {
             return self;
         }
         let detail = detail.unwrap();
         Media {
-            detail: Some(
-                MediaDetail {
-                    detail,
-                    other,
-                }
-            ),
+            detail: Some(MediaDetail { detail, other }),
             ..self
+        }
+    }
+
+    pub fn get_thumbnail<W>(&self, image: &mut W, width: u32, height: u32) -> Result<()>
+    where
+        W: std::io::Write,
+    {
+        match self.kind {
+            MediaType::Image => ImageDetail::get_thumbnail(&self.filepath, image, width, height),
+            _ => Err(Error::NoThumbnail),
         }
     }
 }
@@ -74,21 +83,25 @@ impl From<MediaType> for u32 {
     }
 }
 
-
 impl TryFrom<u32> for MediaType {
     type Error = Error;
     fn try_from(v: u32) -> Result<Self> {
-        Ok(
-            match v {
-                1 => MediaType::Image,
-                2 => MediaType::Text,
-                3 => MediaType::Audio,
-                4 => MediaType::Video,
-                5 => MediaType::URL,
-                10 => MediaType::Other,
-                99999 => MediaType::None,
-                _ => return Err(Error::TypeMismatch { val: v.to_string(), expect: "valid type id".to_string(), found: "invalid type id".to_string() })
-            })
+        Ok(match v {
+            1 => MediaType::Image,
+            2 => MediaType::Text,
+            3 => MediaType::Audio,
+            4 => MediaType::Video,
+            5 => MediaType::URL,
+            10 => MediaType::Other,
+            99999 => MediaType::None,
+            _ => {
+                return Err(Error::TypeMismatch {
+                    val: v.to_string(),
+                    expect: "valid type id".to_string(),
+                    found: "invalid type id".to_string(),
+                })
+            }
+        })
     }
 }
 
@@ -101,14 +114,12 @@ impl ToSql for MediaType {
 
 impl FromSql for MediaType {
     fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
-        value.as_i64().and_then(
-            |v| {
-                match MediaType::try_from(v as u32) {
-                    Ok(v) => Ok(v),
-                    Err(err) => Err(FromSqlError::Other(Box::new(err)))
-                }
-            }
-        )
+        value
+            .as_i64()
+            .and_then(|v| match MediaType::try_from(v as u32) {
+                Ok(v) => Ok(v),
+                Err(err) => Err(FromSqlError::Other(Box::new(err))),
+            })
     }
 }
 
@@ -116,7 +127,7 @@ impl MediaType {
     pub fn is_some(&self) -> bool {
         match self {
             MediaType::None => false,
-            _ => true
+            _ => true,
         }
     }
 
@@ -127,7 +138,9 @@ impl MediaType {
 
 trait Detailize {
     fn get_detail(media_path: &str) -> Result<TypesDetail>;
-    fn get_thumbnail<W>(media_path: &str, image: &mut W, width: u32, height: u32) -> Result<()> where W: std::io::Write;
+    fn get_thumbnail<W>(media_path: &str, image: &mut W, width: u32, height: u32) -> Result<()>
+    where
+        W: std::io::Write;
 }
 
 impl Detailize for ImageDetail {
@@ -144,10 +157,11 @@ impl Detailize for ImageDetail {
                 ImageFormat::Tiff => "TIFF",
                 ImageFormat::Bmp => "BMP",
                 ImageFormat::Ico => "ICO",
-                _ => "OTHER"
+                _ => "OTHER",
             },
-            None => return Err(Error::MediaDecode("Unknown Image format.".to_string()))
-        }.to_string();
+            None => return Err(Error::MediaDecode("Unknown Image format.".to_string())),
+        }
+        .to_string();
         Ok(TypesDetail::Image(ImageDetail {
             width,
             height,
@@ -155,7 +169,10 @@ impl Detailize for ImageDetail {
         }))
     }
 
-    fn get_thumbnail<W>(media_path: &str, image: &mut W, width: u32, height: u32) -> Result<()> where W: std::io::Write {
+    fn get_thumbnail<W>(media_path: &str, image: &mut W, width: u32, height: u32) -> Result<()>
+    where
+        W: std::io::Write,
+    {
         let img = ImageReader::open(media_path)?.decode()?;
         let thumb = img.thumbnail(width, height);
         thumb.write_to(image, ImageFormat::Png)?;
@@ -169,7 +186,10 @@ impl Detailize for TextDetail {
         unimplemented!()
     }
 
-    fn get_thumbnail<W>(media_path: &str, image: &mut W, width: u32, height: u32) -> Result<()> where W: std::io::Write {
+    fn get_thumbnail<W>(media_path: &str, image: &mut W, width: u32, height: u32) -> Result<()>
+    where
+        W: std::io::Write,
+    {
         let _ = media_path;
         let _ = image;
         let _ = width;
@@ -184,7 +204,10 @@ impl Detailize for AudioDetail {
         unimplemented!()
     }
 
-    fn get_thumbnail<W>(media_path: &str, image: &mut W, width: u32, height: u32) -> Result<()> where W: std::io::Write {
+    fn get_thumbnail<W>(media_path: &str, image: &mut W, width: u32, height: u32) -> Result<()>
+    where
+        W: std::io::Write,
+    {
         let _ = media_path;
         let _ = image;
         let _ = width;
@@ -199,7 +222,10 @@ impl Detailize for VideoDetail {
         unimplemented!()
     }
 
-    fn get_thumbnail<W>(media_path: &str, image: &mut W, width: u32, height: u32) -> Result<()> where W: std::io::Write {
+    fn get_thumbnail<W>(media_path: &str, image: &mut W, width: u32, height: u32) -> Result<()>
+    where
+        W: std::io::Write,
+    {
         let _ = media_path;
         let _ = image;
         let _ = width;
@@ -214,7 +240,10 @@ impl Detailize for URLDetail {
         unimplemented!()
     }
 
-    fn get_thumbnail<W>(media_path: &str, image: &mut W, width: u32, height: u32) -> Result<()> where W: std::io::Write {
+    fn get_thumbnail<W>(media_path: &str, image: &mut W, width: u32, height: u32) -> Result<()>
+    where
+        W: std::io::Write,
+    {
         let _ = media_path;
         let _ = image;
         let _ = width;
@@ -235,7 +264,7 @@ impl std::str::FromStr for MediaType {
             "url" => Self::URL,
             "other" => Self::Other,
             "none" => Self::None,
-            _ => Self::Other
+            _ => Self::Other,
         })
     }
 }

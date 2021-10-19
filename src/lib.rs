@@ -15,6 +15,71 @@ mod tests {
     use crate::media::*;
     use crate::misc::*;
 
+    fn insert_5_test_image(lib: &mut Library) -> [u64; 5] {
+        let id1 = lib
+            .add_media(
+                "test/1.jpg".to_string(),
+                MediaType::Image,
+                None,
+                None,
+                None,
+                None,
+            )
+            .expect("??");
+        let id2 = lib
+            .add_media(
+                "test/2.jpg".to_string(),
+                MediaType::Image,
+                None,
+                None,
+                None,
+                None,
+            )
+            .expect("??");
+        let id3 = lib
+            .add_media(
+                "test/3.jpg".to_string(),
+                MediaType::Image,
+                None,
+                None,
+                None,
+                None,
+            )
+            .expect("??");
+        lib.remove_media(id2).unwrap();
+        let id2 = lib
+            .add_media(
+                "test/2.jpg".to_string(),
+                MediaType::Image,
+                None,
+                None,
+                None,
+                None,
+            )
+            .expect("??");
+        let id4 = lib
+            .add_media(
+                "test/4.jpg".to_string(),
+                MediaType::Image,
+                None,
+                None,
+                None,
+                None,
+            )
+            .expect("??");
+        let id5 = lib
+            .add_media(
+                "test/5.jpg".to_string(),
+                MediaType::Image,
+                None,
+                None,
+                None,
+                None,
+            )
+            .expect("??");
+        [id1, id2, id3, id4, id5]
+    }
+
     // #[test]
     fn it_works() {
         let mut lib = Library::open("test.mlib".to_string()).expect("?");
@@ -33,7 +98,7 @@ mod tests {
         dbg!(lib.get_media_by_filename("1.jpg".to_string()));
     }
 
-    #[test]
+    // #[test]
     fn __it_works() {
         println!("test!");
         println!("test2!");
@@ -46,67 +111,7 @@ mod tests {
             LibraryFeatures::new(),
         ) {
             Ok(mut v) => {
-                let id1 = v
-                    .add_media(
-                        "test/1.jpg".to_string(),
-                        MediaType::Image,
-                        None,
-                        None,
-                        None,
-                        None,
-                    )
-                    .expect("??");
-                let id2 = v
-                    .add_media(
-                        "test/2.jpg".to_string(),
-                        MediaType::Image,
-                        None,
-                        None,
-                        None,
-                        None,
-                    )
-                    .expect("??");
-                let id3 = v
-                    .add_media(
-                        "test/3.jpg".to_string(),
-                        MediaType::Image,
-                        None,
-                        None,
-                        None,
-                        None,
-                    )
-                    .expect("??");
-                v.remove_media(id2).unwrap();
-                let id2 = v
-                    .add_media(
-                        "test/2.jpg".to_string(),
-                        MediaType::Image,
-                        None,
-                        None,
-                        None,
-                        None,
-                    )
-                    .expect("??");
-                let id4 = v
-                    .add_media(
-                        "test/4.jpg".to_string(),
-                        MediaType::Image,
-                        None,
-                        None,
-                        None,
-                        None,
-                    )
-                    .expect("??");
-                let id5 = v
-                    .add_media(
-                        "test/5.jpg".to_string(),
-                        MediaType::Image,
-                        None,
-                        None,
-                        None,
-                        None,
-                    )
-                    .expect("??");
+                let [id1, id2, id3, id4, id5] = insert_5_test_image(&mut v);
                 let series_uuid = v
                     .create_set(
                         MediaSetType::Series,
@@ -169,5 +174,27 @@ mod tests {
                 panic!("Error");
             }
         };
+    }
+
+    #[test]
+    fn test_thumbnail() -> std::result::Result<(), crate::misc::Error> {
+        fs::remove_dir_all("test.mlib");
+        let mut lib = match Library::create(
+            ".".to_string(),
+            "test".to_string(),
+            None,
+            Some("Mass".to_string()),
+            LibraryFeatures::new(),
+        ) {
+            Ok(lib) => lib,
+            Err(e) => return Err(e),
+        };
+        let [id1, id2, id3, id4, id5] = insert_5_test_image(&mut lib);
+        println!(
+            "Inserted 5 test images: {}, {}, {}, {}, {}",
+            id1, id2, id3, id4, id5
+        );
+        // lib.make_thumbnail(id2);
+        Ok(())
     }
 }

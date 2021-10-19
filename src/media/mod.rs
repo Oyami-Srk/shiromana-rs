@@ -1,6 +1,5 @@
 mod fmt;
 mod media;
-mod thumbnail;
 
 pub enum MediaUpdateKey {
     Filename,
@@ -129,5 +128,5 @@ impl Default for AddingMediaParam {
 }
 
 pub struct Thumbnail {
-    image: image::DynamicImage
+    image: image::DynamicImage,
 }

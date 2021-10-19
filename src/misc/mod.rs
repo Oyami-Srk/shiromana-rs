@@ -42,6 +42,7 @@ pub enum Error {
     Other(String),
     MediaDecode(String),
     NoneError,
+    NoThumbnail,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
