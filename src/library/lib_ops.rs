@@ -202,8 +202,8 @@ impl Library {
                 );
 
                 CREATE TABLE metadata(
-                    version TEXT NOT NULL NOT NULL UNIQUE,
-                    features TEXT NOT NULL NOT NULL UNIQUE,
+                    version TEXT NOT NULL UNIQUE,
+                    features TEXT NOT NULL UNIQUE
                 );
                 ",
         )?;
@@ -238,11 +238,12 @@ impl Library {
                 CREATE TABLE metadata(
                     library_uuid CHAR(36) PRIMARY KEY NOT NULL UNIQUE
                 );
+
                 CREATE TABLE thumbnail(
                     id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
-                    filename TEXT NOT NULL UNIQUE,
+                    hash CHAR(32) NOT NULL UNIQUE,
                     image BLOB,
-                    size INTEGER NOT NULL,
+                    size INTEGER NOT NULL
                 );
                 ",
         )?;

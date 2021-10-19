@@ -1,4 +1,6 @@
+use std::borrow::Borrow;
 use std::collections::HashMap;
+use std::io::BufRead;
 
 use image::io::Reader as ImageReader;
 use image::ImageFormat;
@@ -173,7 +175,13 @@ impl Detailize for ImageDetail {
     where
         W: std::io::Write,
     {
-        let img = ImageReader::open(media_path)?.decode()?;
+        let f = std::fs::File::open(media_path)?;
+        let mut buffer_reader = std::io::BufReader::with_capacity(16, f);
+        buffer_reader.fill_buf();
+        let img_format = image::guess_format(buffer_reader.buffer())?;
+        let mut img = ImageReader::new(buffer_reader);
+        img.set_format(img_format);
+        let img = img.decode()?;
         let thumb = img.thumbnail(width, height);
         thumb.write_to(image, ImageFormat::Png)?;
         Ok(())

@@ -15,7 +15,7 @@ mod tests {
     use crate::media::*;
     use crate::misc::*;
 
-    fn insert_5_test_image(lib: &mut Library) -> [u64; 5] {
+    fn insert_test_images(lib: &mut Library) -> [u64; 6] {
         let id1 = lib
             .add_media(
                 "test/1.jpg".to_string(),
@@ -69,7 +69,7 @@ mod tests {
             .expect("??");
         let id5 = lib
             .add_media(
-                "test/5.jpg".to_string(),
+                "test/5.gif".to_string(),
                 MediaType::Image,
                 None,
                 None,
@@ -77,7 +77,17 @@ mod tests {
                 None,
             )
             .expect("??");
-        [id1, id2, id3, id4, id5]
+        let id6 = lib
+            .add_media(
+                "test/6.jpg".to_string(),
+                MediaType::Image,
+                None,
+                None,
+                None,
+                None,
+            )
+            .expect("??");
+        [id1, id2, id3, id4, id5, id6]
     }
 
     // #[test]
@@ -111,7 +121,7 @@ mod tests {
             LibraryFeatures::new(),
         ) {
             Ok(mut v) => {
-                let [id1, id2, id3, id4, id5] = insert_5_test_image(&mut v);
+                let [id1, id2, id3, id4, id5, id6] = insert_test_images(&mut v);
                 let series_uuid = v
                     .create_set(
                         MediaSetType::Series,
@@ -189,12 +199,12 @@ mod tests {
             Ok(lib) => lib,
             Err(e) => return Err(e),
         };
-        let [id1, id2, id3, id4, id5] = insert_5_test_image(&mut lib);
+        let [id1, id2, id3, id4, id5, id6] = insert_test_images(&mut lib);
         println!(
-            "Inserted 5 test images: {}, {}, {}, {}, {}",
-            id1, id2, id3, id4, id5
+            "Inserted 5 test images: {}, {}, {}, {}, {}, {}",
+            id1, id2, id3, id4, id5, id6
         );
-        // lib.make_thumbnail(id2);
+        lib.make_thumbnail(id5)?;
         Ok(())
     }
 }

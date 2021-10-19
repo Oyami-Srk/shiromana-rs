@@ -320,9 +320,13 @@ impl Library {
             config::THUMBNAIL_SIZE.1,
         )?;
         let thumb_size = buffer.len();
+        println!(
+            "Generated thumbnail for {} with size {} bytes.",
+            media.hash, thumb_size
+        );
         self.thumbnail_db.execute(
-            "INSERT INTO thumbnail (id, filename, image) VALUES (ZEROBLOB(?));",
-            params![id, media.filename, thumb_size],
+            "INSERT INTO thumbnail (id, hash, image, size) VALUES (?, ?, ZEROBLOB(?), ?);",
+            params![id, media.hash, thumb_size, thumb_size],
         )?;
         let row_id = self.thumbnail_db.last_insert_rowid();
         println!("row_id: {}, id: {}", row_id, id);
@@ -332,10 +336,7 @@ impl Library {
                 .blob_open(DatabaseName::Main, "thumbnail", "image", row_id, false)?;
         let wrote_size = blob.write(&buffer)?;
         assert_eq!(thumb_size, wrote_size); //  hope not panic
-        self.thumbnail_db.execute(
-            "INSERT INTO thumbnail (size) VALUES (?);",
-            params![wrote_size],
-        )?;
+        println!("Thumbnail for id{} size {}", id, wrote_size);
         Ok(buffer)
     }
 }
