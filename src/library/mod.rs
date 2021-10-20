@@ -6,6 +6,8 @@ mod series_ops;
 mod summary;
 mod tag_ops;
 
+type SQLite = r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>;
+
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct LibrarySummary {
     pub media_count: usize,
@@ -17,10 +19,12 @@ pub struct LibrarySummary {
 #[derive(Debug)]
 pub struct Library {
     pub version: semver::Version,
-    pub(crate) db: rusqlite::Connection,
+
+    pub(crate) db: SQLite,
     #[allow(dead_code)]
-    pub(crate) shared_db: rusqlite::Connection,
-    pub(crate) thumbnail_db: rusqlite::Connection,
+    pub(crate) shared_db: SQLite,
+    pub(crate) thumbnail_db: SQLite,
+
     path: String,
     pub uuid: super::misc::Uuid,
     library_name: String,
@@ -55,4 +59,31 @@ pub enum LibraryFeature {
 #[derive(Debug)]
 pub struct LibraryFeatures {
     features: std::collections::HashSet<LibraryFeature>,
+}
+
+#[macro_export]
+macro_rules! get_db_or_err {
+    ( $db:expr ) => {
+        $db.get()?
+    };
+}
+
+#[macro_export]
+macro_rules! get_db_or_none {
+    ( $db:expr ) => {
+        match $db.get() {
+            Ok(db) => db,
+            Err(_) => return None,
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! get_db_or_false {
+    ( $db:expr ) => {
+        match $db.get() {
+            Ok(db) => db,
+            Err(_) => return false,
+        }
+    };
 }

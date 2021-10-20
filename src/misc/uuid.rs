@@ -41,11 +41,10 @@ impl ToSql for Uuid {
 
 impl FromSql for Uuid {
     fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
-        value.as_str()
-            .and_then(|s| match Uuid::from_str(s) {
-                Ok(dt) => Ok(dt),
-                Err(err) => Err(FromSqlError::Other(Box::new(err)))
-            })
+        value.as_str().and_then(|s| match Uuid::from_str(s) {
+            Ok(dt) => Ok(dt),
+            Err(err) => Err(FromSqlError::Other(Box::new(err))),
+        })
     }
 }
 

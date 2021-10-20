@@ -7,7 +7,7 @@ use textwrap::indent;
 use super::super::media::{Media, MediaType};
 use super::super::misc::{config, Error, Result, Uuid};
 use super::{Library, LibraryFeature, LibraryMetadata};
-use crate::err_type_mismatch_expect_dir_found_file;
+use crate::{err_type_mismatch_expect_dir_found_file, get_db_or_none};
 
 impl Library {
     pub fn add_media(
@@ -44,7 +44,7 @@ impl Library {
                 .first()
                 .map(|v| *v);
             return if let Some(id) = id {
-                let _ = self.db.execute(
+                let _ = self.db.get()?.execute(
                     "INSERT INTO media_location_ref (media_id, path, filename) VALUES (?,?,?);",
                     params![
                         id,
@@ -61,16 +61,17 @@ impl Library {
         fs::create_dir_all(new_path.parent().unwrap())?;
         fs::copy(&media_path, &new_path)?;
         let file_size = new_path.metadata()?.len();
-        self.db.execute(
+        let db = self.db.get()?;
+        db.execute(
             "INSERT INTO media (hash, filename, filesize, caption, type, sub_type, type_addition, comment)
             VALUES (?,?,?,?,?,?,?,?);",
             params![file_hash, file_name, &file_size, caption, kind, sub_kind, kind_addition, comment],
         )?;
-        let id = self.db.last_insert_rowid() as u64;
+        let id = db.last_insert_rowid() as u64;
         self.summary.media_count += 1;
         self.summary.media_size += file_size as usize;
         // insert into location ref
-        let _ = self.db.execute(
+        let _ = db.execute(
             "INSERT INTO media_location_ref (media_id, path, filename) VALUES (?,?,?);",
             params![
                 id,
@@ -102,18 +103,20 @@ impl Library {
         comment: Option<String>,
     ) -> Result<u64> {
         let hash = self.hash_algo.do_hash_str(&url)?;
-        self.db.execute(
+        let db = self.db.get()?;
+        db.execute(
             "INSERT INTO media (hash, filename, filesize, caption, type, sub_type, type_addition, comment)
             VALUES (?,?,?,?,?,?,?,?);",
             params![hash, url, 0, caption, MediaType::URL, sub_kind, kind_addition, comment],
         )?;
-        let id = self.db.last_insert_rowid() as u64;
+        let id = db.last_insert_rowid() as u64;
         self.summary.media_count += 1;
         Ok(id)
     }
 
     pub fn remove_media(&mut self, id: u64) -> Result<()> {
-        let (file_hash, file_size): (String, usize) = self.db.query_row(
+        let db = self.db.get()?;
+        let (file_hash, file_size): (String, usize) = db.query_row(
             "SELECT hash, filesize FROM media WHERE id = ?;",
             params![&id],
             |row| Ok((row.get(0)?, row.get(1)?)),
@@ -123,8 +126,7 @@ impl Library {
         if !media_file.is_file() {
             panic!("Media file is not exists or not a regular file.");
         }
-        self.db
-            .execute("DELETE FROM media WHERE id = ?;", params![id])?;
+        db.execute("DELETE FROM media WHERE id = ?;", params![id])?;
         fs::remove_file(&media_file)?;
         println!("Removed {:?}", media_file);
         self.summary.media_size -= file_size;
@@ -136,7 +138,8 @@ impl Library {
     }
 
     pub fn update_media(&mut self, media: &mut Media) -> Result<()> {
-        let is_hash_changed: bool = self.db.query_row(
+        let db = self.db.get()?;
+        let is_hash_changed: bool = db.query_row(
             "SELECT hash != ? FROM media WHERE id = ?;",
             params![&media.hash, media.id],
             |row| Ok(row.get(0)?),
@@ -145,7 +148,7 @@ impl Library {
             // changing hash means to merge two media. if there is no media targeting changed hash
             // we fall. Btw, we tend to keep original media infos instead new one but set filename
             // to the new.
-            let is_that_media_exists: bool = self.db.query_row(
+            let is_that_media_exists: bool = db.query_row(
                 "SELECT EXISTS(SELECT 1 FROM media WHERE hash = ?);",
                 params![&media.hash],
                 |row| Ok(row.get(0)?),
@@ -159,7 +162,7 @@ impl Library {
             fs::remove_file(&media.filepath)?;
             self.summary.media_size -= media.filesize;
             self.summary.media_count -= 1;
-            let new_id: u64 = self.db.query_row(
+            let new_id: u64 = db.query_row(
                 "SELECT id FROM media WHERE hash = ?;",
                 params![&media.hash],
                 |row| Ok(row.get(0)?),
@@ -168,29 +171,29 @@ impl Library {
             media.filesize = new_media.filesize;
             media.filename = new_media.filename;
             media.filepath = new_media.filepath;
-            self.db
-                .execute("DELETE FROM media WHERE id = ?;", params![new_media.id])?;
+            db.execute("DELETE FROM media WHERE id = ?;", params![new_media.id])?;
             // drop new media from database
         }
         if let Some(detail) = &media.detail {
-            let is_detail_exists: bool = self.db.query_row(
+            let db = self.db.get()?;
+            let is_detail_exists: bool = db.query_row(
                 "SELECT EXISTS(SELECT 1 FROM media_detail WHERE id = ?);",
                 params![media.id],
                 |row| Ok(row.get(0)?),
             )?;
             if is_detail_exists {
-                self.db.execute(
+                db.execute(
                     "UPDATE media_detail SET details = ? WHERE id = ?;",
                     params![serde_json::to_string(detail)?, media.id],
                 )?;
             } else {
-                self.db.execute(
+                db.execute(
                     "INSERT INTO media_detail (id, details) VALUES (?, ?);",
                     params![media.id, serde_json::to_string(detail)?],
                 )?;
             }
         }
-        self.db.execute(
+        db.execute(
             "UPDATE media
                   SET hash = ?, filename = ?, filesize = ?, caption = ?, type = ?, sub_type = ?, type_addition = ?, comment = ?
                   WHERE id = ?;",
@@ -202,8 +205,9 @@ impl Library {
     }
 
     pub fn get_media(&self, id: u64) -> Result<Media> {
+        let db = self.db.get()?;
         // TODO: figure out the time spend on selecting one column and more.
-        let mut media = self.db.query_row(
+        let mut media = db.query_row(
             "SELECT
                         hash, filename, filesize, caption, time_add,
                         type, sub_type, type_addition, comment
@@ -214,14 +218,12 @@ impl Library {
                 let file_name = row.get(1)?;
                 let filepath = self.get_media_path_by_hash(&hash);
                 let filepath = filepath.to_str().unwrap().to_string();
-                let series_uuids: Vec<Uuid> = self
-                    .db
+                let series_uuids: Vec<Uuid> = db
                     .prepare("SELECT series_uuid FROM media_series_ref WHERE media_id = ?;")?
                     .query_map(params![id], |row| Ok(row.get(0)?))?
                     .map(|x| x.unwrap())
                     .collect();
-                let tags_uuids: Vec<Uuid> = self
-                    .db
+                let tags_uuids: Vec<Uuid> = db
                     .prepare("SELECT tag_uuid FROM media_tag_ref WHERE media_id = ?;")?
                     .query_map(params![id], |row| Ok(row.get(0)?))?
                     .map(|x| x.unwrap())
@@ -246,13 +248,13 @@ impl Library {
             },
         )?;
 
-        let is_detailed: bool = self.db.query_row(
+        let is_detailed: bool = db.query_row(
             "SELECT EXISTS(SELECT 1 FROM media_detail WHERE id = ?);",
             params![id],
             |row| Ok(row.get(0)?),
         )?;
         if is_detailed & &media.kind.is_some() {
-            let detail: String = self.db.query_row(
+            let detail: String = db.query_row(
                 "SELECT details FROM media_detail WHERE id = ?;",
                 params![id],
                 |row| Ok(row.get(0)?),
@@ -271,11 +273,11 @@ impl Library {
     }
 
     pub fn get_media_by_filename(&self, filename: String) -> Result<Vec<u64>> {
+        let db = self.db.get()?;
         let filename_stem = Path::new(&filename).file_stem().unwrap().to_str().unwrap();
 
         let mut result: Vec<u64> = vec![];
-        let id_fn: Vec<(u64, String)> = self
-            .db
+        let id_fn: Vec<(u64, String)> = db
             .prepare(
                 "SELECT id, filename FROM media_location_ref WHERE filename LIKE ? ESCAPE '\\';",
             )?
@@ -296,8 +298,8 @@ impl Library {
     }
 
     pub fn get_next_no_in_series(&self, uuid: &Uuid) -> Result<Option<u64>> {
-        let max_no: Option<u64> = self
-            .db
+        let db = self.db.get()?;
+        let max_no: Option<u64> = db
             .prepare(
                 "SELECT MAX(series_no) as max_no FROM media_series_ref WHERE series_uuid = ?;",
             )?
@@ -308,6 +310,7 @@ impl Library {
     pub fn query_media(&self, sql_stmt: &str) -> Result<Vec<u64>> {
         Ok(self
             .db
+            .get()?
             .prepare(&format!("SELECT id FROM media WHERE {};", sql_stmt))?
             .query_map(params![], |row| Ok(row.get(0)?))?
             .map(|x| x.unwrap())
@@ -333,32 +336,32 @@ impl Library {
             "Generated thumbnail for {} with size {} bytes.",
             media.hash, thumb_size
         );
-        self.thumbnail_db.execute(
+        let thumbnail_db = self.thumbnail_db.get()?;
+        thumbnail_db.execute(
             "INSERT INTO thumbnail (hash, image, size) VALUES (?, ZEROBLOB(?), ?);",
             params![media.hash, thumb_size, thumb_size],
         )?;
-        let row_id = self.thumbnail_db.last_insert_rowid();
+        let row_id = thumbnail_db.last_insert_rowid();
         println!("Thumbnail size: {} bytes.", thumb_size);
         let mut blob =
-            self.thumbnail_db
-                .blob_open(DatabaseName::Main, "thumbnail", "image", row_id, false)?;
+            thumbnail_db.blob_open(DatabaseName::Main, "thumbnail", "image", row_id, false)?;
         let wrote_size = blob.write(&buffer)?;
         assert_eq!(thumb_size, wrote_size); //  hope not panic
         Ok(buffer)
     }
 
     fn get_thumbnail_no_check(&self, hash: &str) -> Result<Vec<u8>> {
-        let id = self.thumbnail_db.query_row(
+        let thumbnail_db = self.thumbnail_db.get()?;
+        let id = thumbnail_db.query_row(
             "SELECT id FROM thumbnail WHERE hash = ?;",
             params![hash],
             |row| Ok(row.get(0)?),
         )?;
         let mut buffer: Vec<u8> = Vec::new();
         let mut blob =
-            self.thumbnail_db
-                .blob_open(DatabaseName::Main, "thumbnail", "image", id, true)?;
+            thumbnail_db.blob_open(DatabaseName::Main, "thumbnail", "image", id, true)?;
         let read_size = blob.read_to_end(&mut buffer)?;
-        let thumb_size: usize = self.thumbnail_db.query_row(
+        let thumb_size: usize = thumbnail_db.query_row(
             "SELECT size FROM thumbnail WHERE hash = ?;",
             params![hash],
             |row| Ok(row.get(0)?),
@@ -367,34 +370,21 @@ impl Library {
         Ok(buffer)
     }
 
-    pub fn is_thumbnailed(&self, id: u64) -> bool {
-        let hash = match self.get_media_hash(id) {
-            Some(hash) => hash,
-            None => return false,
-        };
-        match self.thumbnail_db.query_row(
-            "SELECT EXISTS(SELECT 1 FROM thumbnail WHERE hash = ?);",
-            params![hash],
-            |row| Ok(row.get(0)?),
-        ) {
-            Ok(v) => v,
-            Err(_) => false,
-        }
-    }
-
     pub fn get_media_hash(&self, id: u64) -> Option<String> {
-        match self
-            .db
-            .query_row("SELECT hash FROM media WHERE id = ?;", params![id], |row| {
-                Ok(row.get(0)?)
-            }) {
+        let db = get_db_or_none!(self.db);
+
+        match db.query_row("SELECT hash FROM media WHERE id = ?;", params![id], |row| {
+            Ok(row.get(0)?)
+        }) {
             Ok(s) => Some(s),
             Err(_) => None,
         }
     }
 
     pub fn get_media_id(&self, hash: &str) -> Option<u64> {
-        match self.db.query_row(
+        let db = get_db_or_none!(self.db);
+
+        match db.query_row(
             "SELECT id FROM media WHERE hash = ?;",
             params![hash],
             |row| Ok(row.get(0)?),

@@ -37,6 +37,7 @@ pub enum Error {
     },
     IO(std::io::Error),
     DB(rusqlite::Error),
+    DBPool(r2d2::Error),
     LockError(LockError),
     JsonError(serde_json::Error),
     Other(String),

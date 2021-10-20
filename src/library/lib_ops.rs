@@ -1,7 +1,7 @@
 use std::{env, fs, path, str, str::FromStr};
 
+use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::params;
-use rusqlite::Connection;
 
 use super::super::misc::{config, tools, Error, HashAlgo, Lock, LockType, Result, Uuid};
 use super::{Library, LibraryFeatures, LibraryMetadata, LibrarySummary};
@@ -57,20 +57,29 @@ impl Library {
         if library_uuid != metadata.UUID {
             return Err(Error::NotMatch("Library UUID".to_string()));
         }
-        let db = Connection::open(config::DATABASE_FN)?;
-        let shared_db = Connection::open(config::SHARED_DATABASE_FN)?;
-        let thumbnail_db = Connection::open(config::THUMBNAIL_DATABASE_FN)?;
+
+        let db = SqliteConnectionManager::file(config::DATABASE_FN);
+        let shared_db = SqliteConnectionManager::file(config::SHARED_DATABASE_FN);
+        let thumbnail_db = SqliteConnectionManager::file(config::THUMBNAIL_DATABASE_FN);
+        let db = r2d2::Pool::new(db)?;
+        let shared_db = r2d2::Pool::new(shared_db)?;
+        let thumbnail_db = r2d2::Pool::new(thumbnail_db)?;
+
         let path = std::env::current_dir()?.to_str().unwrap().to_string();
         std::env::set_current_dir(current_workdir)?;
 
-        let version: String = db.query_row("SELECT version FROM metadata", params![], |row| {
-            Ok(row.get(0)?)
-        })?;
+        let version: String =
+            db.get()?
+                .query_row("SELECT version FROM metadata", params![], |row| {
+                    Ok(row.get(0)?)
+                })?;
         let version = semver::Version::parse(version.as_str()).expect("Broken DB metadata");
 
-        let features: String = db.query_row("SELECT features FROM metadata", params![], |row| {
-            Ok(row.get(0)?)
-        })?;
+        let features: String =
+            db.get()?
+                .query_row("SELECT features FROM metadata", params![], |row| {
+                    Ok(row.get(0)?)
+                })?;
         let features = LibraryFeatures::from_str(features.as_str()).unwrap();
 
         Ok(Library {
@@ -141,8 +150,9 @@ impl Library {
         env::set_current_dir(&library_path)?;
         fs::write(config::FINGERPRINT_FN, &library_uuid.to_string()[..36])?;
         fs::write(config::METADATA_FN, serde_json::to_string(&metadata)?)?;
-        let db = Connection::open(config::DATABASE_FN)?;
-        db.execute_batch(
+        let db = SqliteConnectionManager::file(config::DATABASE_FN);
+        let db = r2d2::Pool::new(db)?;
+        db.get()?.execute_batch(
             "CREATE TABLE media(
                     id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
                     hash CHAR(32) NOT NULL UNIQUE,
@@ -207,7 +217,7 @@ impl Library {
                 );
                 ",
         )?;
-        db.execute(
+        db.get()?.execute(
             &format!(
                 "CREATE TABLE media_series_ref(
                     id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
@@ -226,14 +236,16 @@ impl Library {
             ),
             params![],
         )?;
-        db.execute(
+        db.get()?.execute(
             "INSERT INTO library (uuid, path) VALUES
                     (?, ?);",
             params![&library_uuid, env::current_dir()?.to_str()],
         )?;
-        let shared_db = Connection::open(config::SHARED_DATABASE_FN)?;
-        let thumbnail_db = Connection::open(config::THUMBNAIL_DATABASE_FN)?;
-        thumbnail_db.execute_batch(
+        let shared_db = SqliteConnectionManager::file(config::SHARED_DATABASE_FN);
+        let thumbnail_db = SqliteConnectionManager::file(config::THUMBNAIL_DATABASE_FN);
+        let shared_db = r2d2::Pool::new(shared_db)?;
+        let thumbnail_db = r2d2::Pool::new(thumbnail_db)?;
+        thumbnail_db.get()?.execute_batch(
             "
                 CREATE TABLE metadata(
                     library_uuid CHAR(36) PRIMARY KEY NOT NULL UNIQUE
@@ -247,7 +259,7 @@ impl Library {
                 );
                 ",
         )?;
-        thumbnail_db.execute(
+        thumbnail_db.get()?.execute(
             "INSERT INTO metadata (library_uuid) VALUES (?);",
             params![&library_uuid],
         )?;
@@ -259,7 +271,7 @@ impl Library {
             env!("CARGO_PKG_VERSION_MINOR").parse().unwrap(),
             env!("CARGO_PKG_VERSION_PATCH").parse().unwrap(),
         );
-        db.execute(
+        db.get()?.execute(
             "INSERT INTO metadata (version, features) VALUES (?, ?);",
             params![version.to_string(), features.to_string(),],
         )?;

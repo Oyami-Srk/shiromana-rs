@@ -15,6 +15,7 @@ impl std::fmt::Display for Error {
             NotIn { a, b } => write!(f, "{} is not in {}.", a, b),
             IO(e) => write!(f, "IO Error. ({})", e),
             DB(e) => write!(f, "Database Error. ({})", e),
+            DBPool(e) => write!(f, "Database Connection Pool Error. ({})", e),
             Other(s) => write!(f, "Other Error: {}", s),
             TypeMismatch { val, expect, found } => write!(
                 f,
@@ -34,6 +35,12 @@ impl std::fmt::Display for Error {
 impl From<rusqlite::Error> for Error {
     fn from(err: rusqlite::Error) -> Self {
         Error::DB(err)
+    }
+}
+
+impl From<r2d2::Error> for Error {
+    fn from(err: r2d2::Error) -> Self {
+        Error::DBPool(err)
     }
 }
 
