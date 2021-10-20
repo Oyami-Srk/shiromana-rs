@@ -97,6 +97,7 @@ impl Library {
             hash_algo: HashAlgo::from_string(metadata.hash_algo)?,
             lock,
             features,
+            thread_pool: threadpool::ThreadPool::new(num_cpus::get()),
         })
     }
 
@@ -296,6 +297,7 @@ impl Library {
             hash_algo: HashAlgo::from_string(config::DEFAULT_HASH_ALGO.to_string())?,
             lock,
             features,
+            thread_pool: threadpool::ThreadPool::new(num_cpus::get())
         })
     }
 

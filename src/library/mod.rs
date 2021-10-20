@@ -5,6 +5,7 @@ mod misc;
 mod series_ops;
 mod summary;
 mod tag_ops;
+mod thumbnail;
 
 type SQLite = r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>;
 
@@ -36,6 +37,7 @@ pub struct Library {
     #[allow(dead_code)]
     lock: super::misc::Lock,
     features: LibraryFeatures,
+    thread_pool: threadpool::ThreadPool,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
