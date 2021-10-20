@@ -7,13 +7,33 @@ use rusqlite::{params, DatabaseName};
 
 use super::super::misc::{config, Error, Result};
 use super::Library;
+use std::sync::mpsc::{channel, Receiver};
+
+macro_rules! unwrap_or_send_err {
+    ( $result:expr, $tx:expr, $rx:expr) => {
+        match $result {
+            Ok(v) => v,
+            Err(e) => {
+                $tx.send(Err(e)):
+                return $rx;
+            }
+        }
+    };
+}
 
 impl Library {
-    fn make_thumbnail_no_check(&mut self, hash: &str) -> Result<Vec<u8>> {
+    fn make_thumbnail_no_check(&mut self, hash: &str) -> Receiver<Result<Vec<u8>>> {
+        let (tx, rx) = channel();
+
         let media = self.get_media(match self.get_media_id(hash) {
             Some(id) => id,
-            None => return Err(Error::NotExists(format!("Media with hash {}", hash))),
-        })?;
+            None => {
+                tx.send(Err(Error::NotExists(format!("Media with hash {}", hash))));
+                return rx;
+            }
+        });
+        let media = unwrap_or_send_err!(media, tx, rx);
+
         let mut buffer: Vec<u8> = Vec::new();
         media.get_thumbnail(
             &mut buffer,
@@ -42,48 +62,49 @@ impl Library {
         Ok(buffer)
     }
 
-    fn get_thumbnail_no_check(&self, hash: &str) -> Result<Vec<u8>> {
-        let thumbnail_db = self.thumbnail_db.get()?;
-        let id = thumbnail_db.query_row(
-            "SELECT id FROM thumbnail WHERE hash = ?;",
-            params![hash],
-            |row| Ok(row.get(0)?),
-        )?;
-        let mut buffer: Vec<u8> = Vec::new();
-        let mut blob =
-            thumbnail_db.blob_open(DatabaseName::Main, "thumbnail", "image", id, true)?;
-        let read_size = blob.read_to_end(&mut buffer)?;
-        let thumb_size: usize = thumbnail_db.query_row(
-            "SELECT size FROM thumbnail WHERE hash = ?;",
-            params![hash],
-            |row| Ok(row.get(0)?),
-        )?;
-        assert_eq!(read_size, thumb_size);
-        Ok(buffer)
+    fn get_thumbnail_no_check(&self, hash: &str) -> Receiver<Result<Vec<u8>>> {
+        let (tx, rx) = channel();
+        let thumbnail_db = self.thumbnail_db.clone();
+        let hash = hash.to_string();
+        self.thread_pool.execute(move || {
+            let result = (|| -> Result<Vec<u8>> {
+                let thumbnail_db = thumbnail_db.get()?;
+                let id = thumbnail_db.query_row(
+                    "SELECT id FROM thumbnail WHERE hash = ?;",
+                    params![hash],
+                    |row| Ok(row.get(0)?),
+                )?;
+                let mut buffer: Vec<u8> = Vec::new();
+                let mut blob =
+                    thumbnail_db.blob_open(DatabaseName::Main, "thumbnail", "image", id, true)?;
+                let read_size = blob.read_to_end(&mut buffer)?;
+                let thumb_size: usize = thumbnail_db.query_row(
+                    "SELECT size FROM thumbnail WHERE hash = ?;",
+                    params![hash],
+                    |row| Ok(row.get(0)?),
+                )?;
+                assert_eq!(read_size, thumb_size);
+                Ok(buffer)
+            })();
+            tx.send(result);
+        });
+        rx
     }
 
-    pub fn get_thumbnail(&mut self, id: u64) -> Result<Option<Vec<u8>>> {
+    pub fn get_thumbnail(&mut self, id: u64) -> Receiver<Result<Vec<u8>>> {
         let is_thumbnailed = self.is_thumbnailed(id);
         let hash = &match self.get_media_hash(id) {
             Some(hash) => hash,
             None => panic!("Get media hash failed."),
         };
         if is_thumbnailed {
-            Ok(Some(match self.get_thumbnail_no_check(hash) {
-                Err(Error::NoThumbnail) => return Ok(None),
-                Err(e) => return Err(e),
-                Ok(v) => v,
-            }))
+            self.get_thumbnail_no_check(hash)
         } else {
-            Ok(Some(match self.make_thumbnail_no_check(hash) {
-                Err(Error::NoThumbnail) => return Ok(None),
-                Err(e) => return Err(e),
-                Ok(v) => v,
-            }))
+            self.make_thumbnail_no_check(hash)
         }
     }
 
-    pub fn make_thumbnail(&mut self, id: u64) -> Result<()> {
+    pub fn make_thumbnail(&mut self, id: u64) -> Receiver<Result<Vec<u8>>> {
         let is_thumbnailed = self.is_thumbnailed(id);
         let hash = &match self.get_media_hash(id) {
             Some(hash) => hash,
@@ -94,8 +115,13 @@ impl Library {
             id, is_thumbnailed
         );
         if !is_thumbnailed {
-            self.make_thumbnail_no_check(hash)?;
+            self.make_thumbnail_no_check(hash)
+        } else {
+            self.get_thumbnail_no_check(hash)
         }
-        Ok(())
+    }
+
+    pub fn wait_thumbnail(rx: Receiver<Result<Vec<u8>>>) -> Result<Vec<u8>> {
+        rx.recv()?
     }
 }

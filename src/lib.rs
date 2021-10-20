@@ -201,12 +201,10 @@ mod tests {
             "Inserted 5 test images: {}, {}, {}, {}, {}, {}",
             id1, id2, id3, id4, id5, id6
         );
-        lib.make_thumbnail(id5)?;
-        let buffer = lib.get_thumbnail(id5)?;
-        if let Some(buffer) = buffer {
-            let mut file = std::fs::File::create("test.png")?;
-            file.write(&buffer);
-        }
+        Library::wait_thumbnail(lib.make_thumbnail(id5))?;
+        let buffer = Library::wait_thumbnail(lib.get_thumbnail(id5))?;
+        let mut file = std::fs::File::create("test.png")?;
+        file.write(&buffer);
         Ok(())
     }
 

@@ -28,6 +28,7 @@ impl std::fmt::Display for Error {
             NoneError => write!(f, "Some values goes none."), // TODO: indicated error msg
             MediaDecode(s) => write!(f, "Media decode error: {}", s),
             NoThumbnail => write!(f, "Media no Thumbnail"),
+            InternalSync(e) => write!(f, "Internal Sync Error. ({})", e)
         }
     }
 }
@@ -65,5 +66,11 @@ impl From<::uuid::Error> for Error {
 impl From<image::ImageError> for Error {
     fn from(err: image::ImageError) -> Self {
         Error::MediaDecode(format!("{}", err))
+    }
+}
+
+impl From<std::sync::mpsc::RecvError> for Error {
+    fn from(err: std::sync::mpsc::RecvError) -> Self {
+        Error::InternalSync(Box::new(err))
     }
 }
