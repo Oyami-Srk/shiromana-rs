@@ -7,6 +7,7 @@ pub mod misc;
 mod tests {
     use std::collections::HashMap;
     use std::fs;
+    use std::io::Write;
 
     use sha1::Digest;
     use uuid::Uuid;
@@ -205,6 +206,11 @@ mod tests {
             id1, id2, id3, id4, id5, id6
         );
         lib.make_thumbnail(id5)?;
+        let buffer = lib.get_thumbnail(id5)?;
+        if let Some(buffer) = buffer {
+            let mut file = std::fs::File::create("test.png")?;
+            file.write(&buffer);
+        }
         Ok(())
     }
 }

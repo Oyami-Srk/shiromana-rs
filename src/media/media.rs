@@ -184,7 +184,8 @@ impl Detailize for ImageDetail {
         let img = img.decode()?;
         // TODO: Speed up thumbnailization
         let thumb = img.thumbnail(width, height);
-        thumb.write_to(image, ImageFormat::Png)?;
+        // thumb.write_to(image, ImageFormat::Png)?;
+        thumb.write_to(image, ImageFormat::Jpeg)?;
         Ok(())
     }
 }
