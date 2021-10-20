@@ -131,6 +131,7 @@ impl Library {
         self.summary.media_count -= 1;
         // TODO: REMOVE series and tag notation
         // TODO: REMOVE thumbnail if necessary
+        // TODO: REMOVE details if necessary
         Ok(())
     }
 
@@ -221,7 +222,7 @@ impl Library {
                     .collect();
                 let tags_uuids: Vec<Uuid> = self
                     .db
-                    .prepare("SELECT tags_uuid FROM media_tags_ref WHERE media_id = ?;")?
+                    .prepare("SELECT tag_uuid FROM media_tag_ref WHERE media_id = ?;")?
                     .query_map(params![id], |row| Ok(row.get(0)?))?
                     .map(|x| x.unwrap())
                     .collect();

@@ -1,67 +1,32 @@
 use rusqlite::params;
 
 use super::super::misc::{Error, Result, Uuid};
-use super::{Library, MediaSetType};
+use super::Library;
 
 impl Library {
-    pub fn create_set(
-        &mut self,
-        kind: MediaSetType,
-        caption: String,
-        comment: Option<String>,
-    ) -> Result<Uuid> {
+    pub fn create_series(&mut self, caption: String, comment: Option<String>) -> Result<Uuid> {
         let uuid = Uuid::new_v4();
         self.db.execute(
-            &format!(
-                "INSERT INTO {} (uuid, caption, comment, media_count) VALUES (?, ?, ?, 0);",
-                match kind {
-                    MediaSetType::Series => "series",
-                    MediaSetType::Tag => "tags",
-                }
-            ),
+            "INSERT INTO series (uuid, caption, comment, media_count) VALUES (?, ?, ?, 0);",
             params![uuid, caption, comment],
         )?;
-        match kind {
-            MediaSetType::Series => self.summary.series_count += 1,
-            MediaSetType::Tag => self.summary.tags_count += 1,
-        }
+        self.summary.series_count += 1;
         Ok(uuid)
     }
 
-    pub fn delete_set(&mut self, kind: MediaSetType, uuid: &Uuid) -> Result<()> {
+    pub fn delete_series(&mut self, uuid: &Uuid) -> Result<()> {
         self.db.execute(
-            "DELETE FROM {} WHERE uuid = ?;",
-            params![
-                match kind {
-                    MediaSetType::Series => "series",
-                    MediaSetType::Tag => "tags",
-                },
-                uuid
-            ],
-        )?;
-        self.db.execute(
-            match kind {
-                MediaSetType::Series => "DELETE FROM media_series_ref WHERE series_uuid = ?;",
-                MediaSetType::Tag => "DELETE FROM media_tags_ref WHERE tags_uuid = ?;",
-            },
+            "DELETE FROM media_series_ref WHERE series_uuid = ?;",
             params![uuid],
         )?;
-        self.db.execute(
-            match kind {
-                MediaSetType::Series => "DELETE FROM series WHERE uuid = ?;",
-                MediaSetType::Tag => "DELETE FROM tags WHERE uuid = ?;",
-            },
-            params![uuid],
-        )?;
-        match kind {
-            MediaSetType::Series => self.summary.series_count -= 1,
-            MediaSetType::Tag => self.summary.tags_count -= 1,
-        }
+        self.db
+            .execute("DELETE FROM series WHERE uuid = ?;", params![uuid])?;
+        self.summary.series_count -= 1;
         Ok(())
     }
 
     // Return (Series_UUID, Tag_UUID)
-    pub fn get_set_by_name(&self, caption: String) -> Result<(Option<Uuid>, Option<Uuid>)> {
+    pub fn get_series_by_name(&self, caption: String) -> Result<(Option<Uuid>, Option<Uuid>)> {
         let series_uuid: Option<Uuid> = self
             .db
             .query_row(
@@ -81,85 +46,58 @@ impl Library {
         Ok((series_uuid, tag_uuid))
     }
 
-    pub fn add_to_set(
+    pub fn add_to_series(
         &mut self,
-        kind: MediaSetType,
         id: u64,
         uuid: &Uuid,
         no: Option<u64>,
         unsorted: bool,
     ) -> Result<()> {
-        match kind {
-            MediaSetType::Series => {
-                let mut stmt = self.db.prepare(
-                    "SELECT series_no FROM media_series_ref WHERE series_uuid = ?1 AND media_id != ?2;"
-                )?;
-                let iter = stmt.query_map(params![uuid, id], |row| row.get(0))?;
-                let to_check: Vec<u64> = iter.map(|x| x.unwrap()).collect();
-                let no = if let Some(no) = no {
-                    // if the no is specified.
-                    if to_check.iter().any(|i| *i == no) {
-                        return Err(Error::Occupied(format!(
-                            "occupied when add media(id {}) to series {} with no {}",
-                            id, uuid, no
-                        )));
-                    }
-                    Some(no)
-                } else {
-                    // or this is a unsorted media
-                    if unsorted {
-                        None
-                    } else {
-                        // or not, we use the biggest no in the to_check list +1 to be the no
-                        let biggest = to_check.iter().max();
-                        Some(match biggest {
-                            Some(m) => m + 1,
-                            None => 1,
-                        })
-                    }
-                };
-                self.db.execute(
-                    "INSERT INTO media_series_ref (media_id, series_uuid, series_no) VALUES (?, ?, ?)",
-                    params![id, uuid, no],
-                )?;
-                self.db.execute(
-                    "UPDATE series SET media_count = media_count + 1 WHERE uuid = ?;",
-                    params![uuid],
-                )?;
+        let mut stmt = self.db.prepare(
+            "SELECT series_no FROM media_series_ref WHERE series_uuid = ?1 AND media_id != ?2;",
+        )?;
+        let iter = stmt.query_map(params![uuid, id], |row| row.get(0))?;
+        let to_check: Vec<u64> = iter.map(|x| x.unwrap()).collect();
+        let no = if let Some(no) = no {
+            // if the no is specified.
+            if to_check.iter().any(|i| *i == no) {
+                return Err(Error::Occupied(format!(
+                    "occupied when add media(id {}) to series {} with no {}",
+                    id, uuid, no
+                )));
             }
-            MediaSetType::Tag => {
-                self.db.execute(
-                    "INSERT INTO media_tags_ref (media_id, tag_uuid, series_no) VALUES (?, ?, ?)",
-                    params![id, uuid, no],
-                )?;
-                self.db.execute(
-                    "UPDATE tags SET media_count = media_count + 1 WHERE uuid = ?;",
-                    params![uuid],
-                )?;
+            Some(no)
+        } else {
+            // or this is a unsorted media
+            if unsorted {
+                None
+            } else {
+                // or not, we use the biggest no in the to_check list +1 to be the no
+                let biggest = to_check.iter().max();
+                Some(match biggest {
+                    Some(m) => m + 1,
+                    None => 1,
+                })
             }
-        }
+        };
+        self.db.execute(
+            "INSERT INTO media_series_ref (media_id, series_uuid, series_no) VALUES (?, ?, ?)",
+            params![id, uuid, no],
+        )?;
+        self.db.execute(
+            "UPDATE series SET media_count = media_count + 1 WHERE uuid = ?;",
+            params![uuid],
+        )?;
         Ok(())
     }
 
-    pub fn remove_from_set(&mut self, kind: MediaSetType, id: u64, uuid: &Uuid) -> Result<()> {
+    pub fn remove_from_series(&mut self, id: u64, uuid: &Uuid) -> Result<()> {
         self.db.execute(
-            &format!(
-                "DELETE FROM media_{}_ref WHERE media_id = ? AND series_uuid = ?;",
-                match kind {
-                    MediaSetType::Series => "series",
-                    MediaSetType::Tag => "tags",
-                }
-            ),
+            "DELETE FROM media_series_ref WHERE media_id = ? AND series_uuid = ?;",
             params![id, uuid],
         )?;
         self.db.execute(
-            &format!(
-                "UPDATE {} SET media_count = media_count - 1 WHERE uuid = ?;",
-                match kind {
-                    MediaSetType::Series => "series",
-                    MediaSetType::Tag => "tags",
-                }
-            ),
+            "UPDATE series SET media_count = media_count - 1 WHERE uuid = ?;",
             params![uuid],
         )?;
         Ok(())

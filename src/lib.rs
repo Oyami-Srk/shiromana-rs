@@ -124,18 +124,14 @@ mod tests {
             Ok(mut v) => {
                 let [id1, id2, id3, id4, id5, id6] = insert_test_images(&mut v);
                 let series_uuid = v
-                    .create_set(
-                        MediaSetType::Series,
-                        "test".to_string(),
-                        Some("for_test".to_string()),
-                    )
+                    .create_series("test".to_string(), Some("for_test".to_string()))
                     .unwrap();
                 println!("Create new series with uuid: {}", series_uuid);
-                v.add_to_set(MediaSetType::Series, id1, &series_uuid, Some(9), false);
-                v.add_to_set(MediaSetType::Series, id2, &series_uuid, Some(2), false);
-                v.add_to_set(MediaSetType::Series, id3, &series_uuid, Some(4), false);
-                v.add_to_set(MediaSetType::Series, id4, &series_uuid, Some(6), false);
-                v.remove_from_set(MediaSetType::Series, id2, &series_uuid);
+                v.add_to_series(id1, &series_uuid, Some(9), false);
+                v.add_to_series(id2, &series_uuid, Some(2), false);
+                v.add_to_series(id3, &series_uuid, Some(4), false);
+                v.add_to_series(id4, &series_uuid, Some(6), false);
+                v.remove_from_series(id2, &series_uuid);
                 v.trim_series_no(&series_uuid);
                 assert_eq!(v.get_next_no_in_series(&series_uuid).unwrap(), Some(4));
 
@@ -211,6 +207,24 @@ mod tests {
             let mut file = std::fs::File::create("test.png")?;
             file.write(&buffer);
         }
+        Ok(())
+    }
+
+    #[test]
+    fn test_tag() -> std::result::Result<(), crate::misc::Error> {
+        fs::remove_dir_all("test.mlib");
+        let mut lib = match Library::create(
+            ".".to_string(),
+            "test".to_string(),
+            None,
+            Some("Mass".to_string()),
+            LibraryFeatures::new(),
+        ) {
+            Ok(lib) => lib,
+            Err(e) => return Err(e),
+        };
+        let uuid = lib.create_tag("TestTag".to_string(), None)?;
+        println!("Uuid of tag is {}", uuid);
         Ok(())
     }
 }

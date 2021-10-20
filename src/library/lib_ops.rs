@@ -131,7 +131,7 @@ impl Library {
             summary: LibrarySummary {
                 media_count: 0,
                 series_count: 0,
-                tags_count: 0,
+                tag_count: 0,
                 media_size: 0,
             },
             hash_algo: config::DEFAULT_HASH_ALGO.to_string(),
@@ -163,13 +163,13 @@ impl Library {
                     FOREIGN KEY(id) REFERENCES media(id)
                 );
 
-                CREATE TABLE media_tags_ref(
+                CREATE TABLE media_tag_ref(
                     id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
                     media_id INTEGER NOT NULL,
-                    tags_uuid CHAR(36) NOT NULL,
+                    tag_uuid CHAR(36) NOT NULL,
                     FOREIGN KEY(media_id) REFERENCES media(id),
-                    FOREIGN KEY(tags_uuid) REFERENCES tags(uuid),
-                    CONSTRAINT unique_uuid_id UNIQUE (media_id, tags_uuid)
+                    FOREIGN KEY(tag_uuid) REFERENCES tags(uuid),
+                    CONSTRAINT unique_uuid_id UNIQUE (media_id, tag_uuid)
                 );
 
                 CREATE TABLE series(
@@ -179,7 +179,7 @@ impl Library {
                    comment TEXT
                 );
 
-                CREATE TABLE tags(
+                CREATE TABLE tag(
                    uuid CHAR(36) PRIMARY KEY NOT NULL UNIQUE,
                    caption TEXT UNIQUE NOT NULL,
                    media_count INTEGER,
@@ -278,7 +278,7 @@ impl Library {
             summary: LibrarySummary {
                 media_count: 0,
                 series_count: 0,
-                tags_count: 0,
+                tag_count: 0,
                 media_size: 0,
             },
             hash_algo: HashAlgo::from_string(config::DEFAULT_HASH_ALGO.to_string())?,

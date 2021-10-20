@@ -1,14 +1,16 @@
+mod guards;
 mod lib_ops;
 mod media_ops;
 mod misc;
 mod series_ops;
 mod summary;
+mod tag_ops;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct LibrarySummary {
     pub media_count: usize,
     pub series_count: usize,
-    pub tags_count: usize,
+    pub tag_count: usize,
     pub media_size: usize,
 }
 
@@ -16,6 +18,7 @@ pub struct LibrarySummary {
 pub struct Library {
     pub version: semver::Version,
     pub(crate) db: rusqlite::Connection,
+    #[allow(dead_code)]
     pub(crate) shared_db: rusqlite::Connection,
     pub(crate) thumbnail_db: rusqlite::Connection,
     path: String,
@@ -26,6 +29,7 @@ pub struct Library {
     media_folder: String,
     summary: LibrarySummary,
     hash_algo: super::misc::HashAlgo,
+    #[allow(dead_code)]
     lock: super::misc::Lock,
     features: LibraryFeatures,
 }
@@ -40,12 +44,6 @@ pub struct LibraryMetadata {
     schema: String,
     hash_algo: String,
     summary: LibrarySummary,
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
-pub enum MediaSetType {
-    Tag,
-    Series,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq, Eq, Hash)]

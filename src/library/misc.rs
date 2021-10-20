@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use super::super::misc::{Error, Result};
 use super::{Library, LibraryFeature, LibraryFeatures};
 use std::collections::HashSet;
