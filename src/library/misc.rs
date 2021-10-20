@@ -1,5 +1,5 @@
 use super::super::misc::{Error, Result};
-use super::{LibraryFeature, LibraryFeatures};
+use super::{Library, LibraryFeature, LibraryFeatures};
 use std::collections::HashSet;
 use std::fmt;
 use std::str::FromStr;
@@ -75,5 +75,11 @@ impl LibraryFeatures {
 
     pub fn contains(&self, feature: LibraryFeature) -> bool {
         self.features.contains(&feature)
+    }
+
+    pub fn with(self, feature: LibraryFeature) -> Self {
+        let mut p = Self { ..self };
+        p.add(feature);
+        p
     }
 }

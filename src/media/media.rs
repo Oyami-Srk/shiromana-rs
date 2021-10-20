@@ -177,11 +177,12 @@ impl Detailize for ImageDetail {
     {
         let f = std::fs::File::open(media_path)?;
         let mut buffer_reader = std::io::BufReader::with_capacity(16, f);
-        buffer_reader.fill_buf();
+        buffer_reader.fill_buf()?;
         let img_format = image::guess_format(buffer_reader.buffer())?;
         let mut img = ImageReader::new(buffer_reader);
         img.set_format(img_format);
         let img = img.decode()?;
+        // TODO: Speed up thumbnailization
         let thumb = img.thumbnail(width, height);
         thumb.write_to(image, ImageFormat::Png)?;
         Ok(())

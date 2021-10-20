@@ -1,3 +1,4 @@
+use std::io::Read;
 use std::{fmt, fs, io::Write, path, path::Path, str};
 
 use rusqlite::{params, DatabaseName};
@@ -53,6 +54,7 @@ impl Library {
                 ); // ignore fails
                 Err(Error::AlreadyExists(id.to_string()))
             } else {
+                // shouldn't reach
                 Err(Error::AlreadyExists(file_hash))
             };
         }
@@ -82,7 +84,11 @@ impl Library {
             .contains(LibraryFeature::GenerateThumbnailAtAdding)
         {
             // generate thumbnail image at adding
-            self.make_thumbnail(id)?;
+            match self.make_thumbnail(id) {
+                Err(Error::NoThumbnail) => (),
+                Err(e) => return Err(e),
+                Ok(_) => (),
+            }
         }
         Ok(id)
     }
@@ -124,6 +130,7 @@ impl Library {
         self.summary.media_size -= file_size;
         self.summary.media_count -= 1;
         // TODO: REMOVE series and tag notation
+        // TODO: REMOVE thumbnail if necessary
         Ok(())
     }
 
@@ -306,13 +313,11 @@ impl Library {
             .collect())
     }
 
-    pub fn get_thumbnail(&mut self, id: u64) -> Option<Vec<u8>> {
-        let mut buffer: Vec<u8> = Vec::new();
-        Some(buffer)
-    }
-
-    pub fn make_thumbnail(&mut self, id: u64) -> Result<Vec<u8>> {
-        let media = self.get_media(id)?;
+    fn make_thumbnail_no_check(&mut self, hash: &str) -> Result<Vec<u8>> {
+        let media = self.get_media(match self.get_media_id(hash) {
+            Some(id) => id,
+            None => return Err(Error::NotExists(format!("Media with hash {}", hash))),
+        })?;
         let mut buffer: Vec<u8> = Vec::new();
         media.get_thumbnail(
             &mut buffer,
@@ -320,24 +325,120 @@ impl Library {
             config::THUMBNAIL_SIZE.1,
         )?;
         let thumb_size = buffer.len();
+        if thumb_size <= 0 {
+            return Err(Error::NoThumbnail);
+        }
         println!(
             "Generated thumbnail for {} with size {} bytes.",
             media.hash, thumb_size
         );
         self.thumbnail_db.execute(
-            "INSERT INTO thumbnail (id, hash, image, size) VALUES (?, ?, ZEROBLOB(?), ?);",
-            params![id, media.hash, thumb_size, thumb_size],
+            "INSERT INTO thumbnail (hash, image, size) VALUES (?, ZEROBLOB(?), ?);",
+            params![media.hash, thumb_size, thumb_size],
         )?;
         let row_id = self.thumbnail_db.last_insert_rowid();
-        println!("row_id: {}, id: {}", row_id, id);
         println!("Thumbnail size: {} bytes.", thumb_size);
         let mut blob =
             self.thumbnail_db
                 .blob_open(DatabaseName::Main, "thumbnail", "image", row_id, false)?;
         let wrote_size = blob.write(&buffer)?;
         assert_eq!(thumb_size, wrote_size); //  hope not panic
-        println!("Thumbnail for id{} size {}", id, wrote_size);
         Ok(buffer)
+    }
+
+    fn get_thumbnail_no_check(&self, hash: &str) -> Result<Vec<u8>> {
+        let id = self.thumbnail_db.query_row(
+            "SELECT id FROM thumbnail WHERE hash = ?;",
+            params![hash],
+            |row| Ok(row.get(0)?),
+        )?;
+        let mut buffer: Vec<u8> = Vec::new();
+        let mut blob =
+            self.thumbnail_db
+                .blob_open(DatabaseName::Main, "thumbnail", "image", id, true)?;
+        let read_size = blob.read_to_end(&mut buffer)?;
+        let thumb_size: usize = self.thumbnail_db.query_row(
+            "SELECT size FROM thumbnail WHERE hash = ?;",
+            params![hash],
+            |row| Ok(row.get(0)?),
+        )?;
+        assert_eq!(read_size, thumb_size);
+        Ok(buffer)
+    }
+
+    pub fn is_thumbnailed(&self, id: u64) -> bool {
+        let hash = match self.get_media_hash(id) {
+            Some(hash) => hash,
+            None => return false,
+        };
+        match self.thumbnail_db.query_row(
+            "SELECT EXISTS(SELECT 1 FROM thumbnail WHERE hash = ?);",
+            params![hash],
+            |row| Ok(row.get(0)?),
+        ) {
+            Ok(v) => v,
+            Err(_) => false,
+        }
+    }
+
+    pub fn get_media_hash(&self, id: u64) -> Option<String> {
+        match self
+            .db
+            .query_row("SELECT hash FROM media WHERE id = ?;", params![id], |row| {
+                Ok(row.get(0)?)
+            }) {
+            Ok(s) => Some(s),
+            Err(_) => None,
+        }
+    }
+
+    pub fn get_media_id(&self, hash: &str) -> Option<u64> {
+        match self.db.query_row(
+            "SELECT id FROM media WHERE hash = ?;",
+            params![hash],
+            |row| Ok(row.get(0)?),
+        ) {
+            Ok(id) => Some(id),
+            Err(_) => None,
+        }
+    }
+
+    pub fn get_thumbnail(&mut self, id: u64) -> Result<Option<Vec<u8>>> {
+        let is_thumbnailed = self.is_thumbnailed(id);
+        let hash = &match self.get_media_hash(id) {
+            Some(hash) => hash,
+            None => panic!("Get media hash failed."),
+        };
+        if is_thumbnailed {
+            Ok(Some(match self.get_thumbnail_no_check(hash) {
+                Err(Error::NoThumbnail) => return Ok(None),
+                Err(e) => return Err(e),
+                Ok(v) => v,
+            }))
+        } else {
+            Ok(Some(match self.make_thumbnail_no_check(hash) {
+                Err(Error::NoThumbnail) => return Ok(None),
+                Err(e) => return Err(e),
+                Ok(v) => v,
+            }))
+        }
+    }
+
+    pub fn make_thumbnail(&mut self, id: u64) -> Result<Vec<u8>> {
+        let is_thumbnailed = self.is_thumbnailed(id);
+        let hash = &match self.get_media_hash(id) {
+            Some(hash) => hash,
+            None => panic!("Get media hash failed."),
+        };
+        println!(
+            "Make thumbnail for id {}, with is_thumbnailed = {}",
+            id, is_thumbnailed
+        );
+        if is_thumbnailed {
+            Ok(self.get_thumbnail_no_check(hash)?)
+        } else {
+            self.make_thumbnail_no_check(hash)
+        }
     }
 }
 

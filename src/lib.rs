@@ -108,7 +108,7 @@ mod tests {
         dbg!(lib.get_media_by_filename("1.jpg".to_string()));
     }
 
-    // #[test]
+    #[test]
     fn __it_works() {
         println!("test!");
         println!("test2!");
@@ -118,7 +118,7 @@ mod tests {
             "test".to_string(),
             None,
             Some("Mass".to_string()),
-            LibraryFeatures::new(),
+            LibraryFeatures::new().with(LibraryFeature::GenerateThumbnailAtAdding),
         ) {
             Ok(mut v) => {
                 let [id1, id2, id3, id4, id5, id6] = insert_test_images(&mut v);
