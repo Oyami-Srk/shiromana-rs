@@ -171,6 +171,7 @@ mod tests {
                         };
                         adding();
                     }
+                    v.wait_workers();
                     let end = chrono::Local::now();
                     println!("Time usage: {}", end - begin);
                 }

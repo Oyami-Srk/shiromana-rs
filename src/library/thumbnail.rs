@@ -14,7 +14,7 @@ macro_rules! unwrap_or_send_err {
         match $result {
             Ok(v) => v,
             Err(e) => {
-                $tx.send(Err(e)):
+                $tx.send(Err(e)).unwrap();
                 return $rx;
             }
         }
@@ -28,38 +28,51 @@ impl Library {
         let media = self.get_media(match self.get_media_id(hash) {
             Some(id) => id,
             None => {
-                tx.send(Err(Error::NotExists(format!("Media with hash {}", hash))));
+                tx.send(Err(Error::NotExists(format!("Media with hash {}", hash))))
+                    .unwrap();
                 return rx;
             }
         });
         let media = unwrap_or_send_err!(media, tx, rx);
+        let thumbnail_db = self.thumbnail_db.clone();
 
-        let mut buffer: Vec<u8> = Vec::new();
-        media.get_thumbnail(
-            &mut buffer,
-            config::THUMBNAIL_SIZE.0,
-            config::THUMBNAIL_SIZE.1,
-        )?;
-        let thumb_size = buffer.len();
-        if thumb_size <= 0 {
-            return Err(Error::NoThumbnail);
-        }
-        println!(
-            "Generated thumbnail for {} with size {} bytes.",
-            media.hash, thumb_size
-        );
-        let thumbnail_db = self.thumbnail_db.get()?;
-        thumbnail_db.execute(
-            "INSERT INTO thumbnail (hash, image, size) VALUES (?, ZEROBLOB(?), ?);",
-            params![media.hash, thumb_size, thumb_size],
-        )?;
-        let row_id = thumbnail_db.last_insert_rowid();
-        println!("Thumbnail size: {} bytes.", thumb_size);
-        let mut blob =
-            thumbnail_db.blob_open(DatabaseName::Main, "thumbnail", "image", row_id, false)?;
-        let wrote_size = blob.write(&buffer)?;
-        assert_eq!(thumb_size, wrote_size); //  hope not panic
-        Ok(buffer)
+        self.thread_pool.execute(move || {
+            let result = (|| {
+                let mut buffer: Vec<u8> = Vec::new();
+                media.get_thumbnail(
+                    &mut buffer,
+                    config::THUMBNAIL_SIZE.0,
+                    config::THUMBNAIL_SIZE.1,
+                )?;
+                let thumb_size = buffer.len();
+                if thumb_size <= 0 {
+                    return Err(Error::NoThumbnail);
+                }
+                println!(
+                    "Generated thumbnail for {} with size {} bytes.",
+                    media.hash, thumb_size
+                );
+                let thumbnail_db = thumbnail_db.get()?;
+                thumbnail_db.execute(
+                    "INSERT INTO thumbnail (hash, image, size) VALUES (?, ZEROBLOB(?), ?);",
+                    params![media.hash, thumb_size, thumb_size],
+                )?;
+                let row_id = thumbnail_db.last_insert_rowid();
+                println!("Thumbnail size: {} bytes.", thumb_size);
+                let mut blob = thumbnail_db.blob_open(
+                    DatabaseName::Main,
+                    "thumbnail",
+                    "image",
+                    row_id,
+                    false,
+                )?;
+                let wrote_size = blob.write(&buffer)?;
+                assert_eq!(thumb_size, wrote_size); //  hope not panic
+                Ok(buffer)
+            })();
+            let _ = tx.send(result); // drop result
+        });
+        rx
     }
 
     fn get_thumbnail_no_check(&self, hash: &str) -> Receiver<Result<Vec<u8>>> {
@@ -86,7 +99,7 @@ impl Library {
                 assert_eq!(read_size, thumb_size);
                 Ok(buffer)
             })();
-            tx.send(result);
+            let _ = tx.send(result); // drop result
         });
         rx
     }

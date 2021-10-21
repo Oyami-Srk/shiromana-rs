@@ -1,11 +1,10 @@
-use std::{fmt, fs, path, path::Path, str};
+use std::{fs, path, path::Path, str};
 
 use rusqlite::params;
-use textwrap::indent;
 
 use super::super::media::{Media, MediaType};
-use super::super::misc::{config, Error, Result, Uuid};
-use super::{Library, LibraryFeature, LibraryMetadata};
+use super::super::misc::{Error, Result, Uuid};
+use super::{Library, LibraryFeature};
 use crate::{err_type_mismatch_expect_dir_found_file, get_db_or_none};
 
 impl Library {
@@ -84,11 +83,7 @@ impl Library {
             .contains(LibraryFeature::GenerateThumbnailAtAdding)
         {
             // generate thumbnail image at adding
-            match self.make_thumbnail(id) {
-                Err(Error::NoThumbnail) => (),
-                Err(e) => return Err(e),
-                Ok(_) => (),
-            }
+            let _ = self.make_thumbnail(id);
         }
         Ok(id)
     }
@@ -338,39 +333,6 @@ impl Library {
             Ok(id) => Some(id),
             Err(_) => None,
         }
-    }
-}
-
-impl Drop for Library {
-    fn drop(&mut self) {
-        let metadata = LibraryMetadata {
-            UUID: self.uuid.to_string(),
-            library_name: self.library_name.clone(),
-            master_name: self.master_name.clone(),
-            schema: self.schema.clone(),
-            summary: self.summary.clone(),
-            hash_algo: self.hash_algo.to_string(),
-            media_folder: self.media_folder.clone(),
-        };
-        fs::write(
-            path::PathBuf::new()
-                .join(&self.path[..])
-                .join(config::METADATA_FN),
-            serde_json::to_string(&metadata).expect("Cannot serialize metadata."),
-        )
-        .expect("Cannot write to metadata.");
-    }
-}
-
-impl fmt::Display for Library {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Library name: {}\nMaster name: {}\nUUID: {}\nPath: {}\nschema: {}\nLibrary Summary:\n{}",
-               self.library_name,
-               self.master_name.as_ref().unwrap_or(&"".to_string()),
-               self.uuid,
-               self.path,
-               self.schema,
-               indent(&format!("{}", self.summary), "    |-"))
     }
 }
 

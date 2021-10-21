@@ -1,4 +1,5 @@
-use std::{env, fs, path, str, str::FromStr};
+use std::{env, fmt, fs, path, str, str::FromStr};
+use textwrap::indent;
 
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::params;
@@ -297,8 +298,12 @@ impl Library {
             hash_algo: HashAlgo::from_string(config::DEFAULT_HASH_ALGO.to_string())?,
             lock,
             features,
-            thread_pool: threadpool::ThreadPool::new(num_cpus::get())
+            thread_pool: threadpool::ThreadPool::new(num_cpus::get()),
         })
+    }
+
+    pub fn wait_workers(&self) {
+        self.thread_pool.join();
     }
 
     pub fn get_library_name(&self) -> &String {
@@ -327,5 +332,39 @@ impl Library {
 
     pub fn get_hash_size(&self) -> usize {
         self.hash_algo.get_size()
+    }
+}
+
+impl Drop for Library {
+    fn drop(&mut self) {
+        let metadata = LibraryMetadata {
+            UUID: self.uuid.to_string(),
+            library_name: self.library_name.clone(),
+            master_name: self.master_name.clone(),
+            schema: self.schema.clone(),
+            summary: self.summary.clone(),
+            hash_algo: self.hash_algo.to_string(),
+            media_folder: self.media_folder.clone(),
+        };
+        fs::write(
+            path::PathBuf::new()
+                .join(&self.path[..])
+                .join(config::METADATA_FN),
+            serde_json::to_string(&metadata).expect("Cannot serialize metadata."),
+        )
+        .expect("Cannot write to metadata.");
+        self.thread_pool.join();
+    }
+}
+
+impl fmt::Display for Library {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Library name: {}\nMaster name: {}\nUUID: {}\nPath: {}\nschema: {}\nLibrary Summary:\n{}",
+               self.library_name,
+               self.master_name.as_ref().unwrap_or(&"".to_string()),
+               self.uuid,
+               self.path,
+               self.schema,
+               indent(&format!("{}", self.summary), "    |-"))
     }
 }
