@@ -1,6 +1,6 @@
 [package]
 name = "shiromana-rs"
-version = "1.0.1"
+version = "1.1.0"
 authors = ["Oyami-Srk <hhx.xxm@gmail.com>"]
 edition = "2018"
 
