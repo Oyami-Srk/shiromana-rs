@@ -64,7 +64,7 @@ impl Library {
         Ok(uuid)
     }
 
-    pub fn destroy_tag(&mut self, tag_uuid: Uuid) -> Result<()> {
+    pub fn delete_tag(&mut self, tag_uuid: Uuid) -> Result<()> {
         self.tag_exist_guard(tag_uuid)?;
 
         let db = self.db.get()?;

@@ -186,7 +186,7 @@ impl Library {
 
                 CREATE TABLE series(
                    uuid CHAR(36) PRIMARY KEY NOT NULL UNIQUE,
-                   caption TEXT UNIQUE NOT NULL,
+                   caption TEXT NOT NULL,
                    media_count INTEGER,
                    comment TEXT
                 );
