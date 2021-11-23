@@ -40,9 +40,10 @@ pub struct Library {
     thread_pool: threadpool::ThreadPool,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[allow(non_snake_case)]
 pub struct LibraryMetadata {
+    version: String,
     UUID: String,
     library_name: String,
     master_name: Option<String>,

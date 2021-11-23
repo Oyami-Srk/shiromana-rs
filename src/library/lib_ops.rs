@@ -133,7 +133,15 @@ impl Library {
             }
             None => config::DEFAULT_MEDIAS_FOLDER.to_string(),
         };
+
+        let version = semver::Version::new(
+            env!("CARGO_PKG_VERSION_MAJOR").parse().unwrap(),
+            env!("CARGO_PKG_VERSION_MINOR").parse().unwrap(),
+            env!("CARGO_PKG_VERSION_PATCH").parse().unwrap(),
+        );
+
         let metadata = LibraryMetadata {
+            version: version.to_string(),
             UUID: library_uuid.to_string(),
             library_name: library_name.clone(),
             master_name: master_name.clone(),
@@ -268,11 +276,7 @@ impl Library {
         fs::create_dir(&media_folder)?;
         env::set_current_dir(current_dir)?;
         let library_path = library_path.canonicalize()?;
-        let version = semver::Version::new(
-            env!("CARGO_PKG_VERSION_MAJOR").parse().unwrap(),
-            env!("CARGO_PKG_VERSION_MINOR").parse().unwrap(),
-            env!("CARGO_PKG_VERSION_PATCH").parse().unwrap(),
-        );
+
         db.get()?.execute(
             "INSERT INTO metadata (version, features) VALUES (?, ?);",
             params![version.to_string(), features.to_string(),],
@@ -330,6 +334,19 @@ impl Library {
         &self.summary
     }
 
+    pub fn get_metadata(&self) -> LibraryMetadata {
+        LibraryMetadata {
+            version: self.version.to_string(),
+            UUID: self.uuid.to_string(),
+            library_name: self.library_name.clone(),
+            master_name: self.master_name.clone(),
+            schema: self.schema.clone(),
+            summary: self.summary.clone(),
+            hash_algo: self.hash_algo.to_string(),
+            media_folder: self.media_folder.clone(),
+        }
+    }
+
     pub fn get_hash_size(&self) -> usize {
         self.hash_algo.get_size()
     }
@@ -338,6 +355,7 @@ impl Library {
 impl Drop for Library {
     fn drop(&mut self) {
         let metadata = LibraryMetadata {
+            version: self.version.to_string(),
             UUID: self.uuid.to_string(),
             library_name: self.library_name.clone(),
             master_name: self.master_name.clone(),

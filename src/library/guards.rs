@@ -7,7 +7,7 @@ use super::Library;
 use crate::get_db_or_false;
 
 impl Library {
-    pub(crate) fn is_tag_existed(&self, tag_uuid: Uuid) -> bool {
+    pub(crate) fn is_tag_existed(&self, tag_uuid: &Uuid) -> bool {
         let db = get_db_or_false!(self.db);
         match db.query_row(
             "SELECT EXISTS(SELECT 1 FROM tag WHERE uuid = ?);",
@@ -19,7 +19,7 @@ impl Library {
         }
     }
 
-    pub(crate) fn tag_exist_guard(&self, tag_uuid: Uuid) -> Result<()> {
+    pub(crate) fn tag_exist_guard(&self, tag_uuid: &Uuid) -> Result<()> {
         if !self.is_tag_existed(tag_uuid) {
             Err(Error::NotExists(format!(
                 "Tag with uuid {} not exists.",

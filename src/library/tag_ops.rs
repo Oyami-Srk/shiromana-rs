@@ -4,7 +4,7 @@ use super::super::misc::{Error, Result, Uuid};
 use super::Library;
 
 impl Library {
-    pub fn add_tag(&mut self, id: u64, tag_uuid: Uuid) -> Result<()> {
+    pub fn add_tag(&mut self, id: u64, tag_uuid: &Uuid) -> Result<()> {
         let db = self.db.get()?;
         self.tag_exist_guard(tag_uuid)?;
         self.media_exist_guard(id)?;
@@ -20,7 +20,7 @@ impl Library {
         Ok(())
     }
 
-    pub fn remove_tag(&mut self, id: u64, tag_uuid: Uuid) -> Result<()> {
+    pub fn remove_tag(&mut self, id: u64, tag_uuid: &Uuid) -> Result<()> {
         let db = self.db.get()?;
         self.tag_exist_guard(tag_uuid)?;
         self.media_exist_guard(id)?;
@@ -65,7 +65,7 @@ impl Library {
     }
 
     pub fn delete_tag(&mut self, tag_uuid: Uuid) -> Result<()> {
-        self.tag_exist_guard(tag_uuid)?;
+        self.tag_exist_guard(&tag_uuid)?;
 
         let db = self.db.get()?;
         db.execute(

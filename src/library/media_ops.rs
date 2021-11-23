@@ -311,6 +311,14 @@ impl Library {
             .collect())
     }
 
+    pub fn get_medias<I>(&self, ids: I) -> Vec<(u64, Result<Media>)>
+    where
+        I: std::iter::Iterator<Item = u64>,
+    {
+        // TODO: improve performance
+        ids.map(|v| (v, self.get_media(v))).collect()
+    }
+
     pub fn get_media_hash(&self, id: u64) -> Option<String> {
         let db = get_db_or_none!(self.db);
 
